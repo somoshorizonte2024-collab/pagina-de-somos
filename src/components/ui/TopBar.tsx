@@ -1,12 +1,14 @@
 import React from 'react';
+import { Users } from 'lucide-react';
 import { SomosLogo } from './SomosLogo';
 import { soundscape } from '../../audio/soundscape';
 
 interface TopBarProps {
   onOpenCarnet: () => void;
+  onOpenAdmin?: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onOpenCarnet }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onOpenCarnet, onOpenAdmin }) => {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 h-16 px-4 sm:px-8 flex items-center justify-between gap-4 md:gap-8 bg-[#0C2340]/85 backdrop-blur-md border-b border-white/10 select-none">
       {/* Logotipo Oficial SOMOS Jujuy */}
@@ -62,6 +64,21 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenCarnet }) => {
               <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.04-.1z" />
             </svg>
           </a>
+
+          {/* Acceso a Padrón Territorial y Contactos */}
+          {onOpenAdmin && (
+            <button
+              onClick={() => {
+                soundscape.playClick();
+                onOpenAdmin();
+              }}
+              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-[#00AEEF]/20 border border-white/10 hover:border-[#00AEEF] flex items-center justify-center text-slate-300 hover:text-[#00AEEF] transition-colors cursor-pointer"
+              title="Padrón y Contactos (Administración)"
+              aria-label="Padrón y Contactos"
+            >
+              <Users className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Acción Primaria */}

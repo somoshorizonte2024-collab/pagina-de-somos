@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { TopBar } from './components/ui/TopBar';
 import { CinematicCanvas } from './components/scene/CinematicCanvas';
 import { CarnetModal } from './components/carnet/CarnetModal';
+import { CredencialVerificationModal } from './components/carnet/CredencialVerificationModal';
+import { AdminModal } from './components/admin/AdminModal';
 import { soundscape } from './audio/soundscape';
 import { CAMPAIGN_COPY } from './data/campaignCopy';
 import {
@@ -31,8 +33,29 @@ const SLIDES = CAMPAIGN_COPY.slides.map((slide, idx) => ({
 export default function App() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isCarnetOpen, setIsCarnetOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [verificarAfiliadoId, setVerificarAfiliadoId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+
+  // Detectar si alguien escaneó un código QR con ?validar=SOMOS-JUJ-XXXX o /validar/SOMOS-JUJ-XXXX
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const idFromQuery = urlParams.get('validar');
+    if (idFromQuery) {
+      setVerificarAfiliadoId(idFromQuery);
+      return;
+    }
+
+    const path = window.location.pathname;
+    if (path.startsWith('/validar/')) {
+      const idFromPath = path.replace('/validar/', '').trim();
+      if (idFromPath) {
+        setVerificarAfiliadoId(idFromPath);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     return soundscape.subscribe((playing, muted) => {
@@ -64,6 +87,8 @@ export default function App() {
         setCurrentSlide(Number(e.key) - 1);
       } else if (e.key === 'Escape') {
         setIsCarnetOpen(false);
+        setIsAdminOpen(false);
+        setVerificarAfiliadoId(null);
       }
     };
 
@@ -85,7 +110,10 @@ export default function App() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#0C2340] text-slate-100 select-none font-sans">
       {/* 1. Barra de Navegación Superior Limpia con Redes Oficiales */}
-      <TopBar onOpenCarnet={() => setIsCarnetOpen(true)} />
+      <TopBar
+        onOpenCarnet={() => setIsCarnetOpen(true)}
+        onOpenAdmin={() => setIsAdminOpen(true)}
+      />
 
       {/* 2. Lienzo WebGL Cinemático con Distorsión Líquida y Partículas */}
       <CinematicCanvas currentSlideIndex={currentSlide} slides={SLIDES} />
@@ -172,6 +200,19 @@ export default function App() {
 
       {/* 5. Modal de Carnet Oficial de Afiliación (Padrón Permanente con Números Únicos) */}
       <CarnetModal isOpen={isCarnetOpen} onClose={() => setIsCarnetOpen(false)} />
+
+      {/* 6. Panel de Gestión y Contactos Territorial (Administración SOMOS Jujuy) */}
+      <AdminModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
+
+      {/* 7. Modal de Verificación Pública de Credencial por Código QR */}
+      <CredencialVerificationModal
+        numeroAfiliado={verificarAfiliadoId}
+        onClose={() => setVerificarAfiliadoId(null)}
+        onOpenCarnet={() => {
+          setVerificarAfiliadoId(null);
+          setIsCarnetOpen(true);
+        }}
+      />
     </div>
   );
 }

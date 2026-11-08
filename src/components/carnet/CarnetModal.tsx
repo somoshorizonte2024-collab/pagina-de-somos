@@ -29,6 +29,7 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
   const [municipio, setMunicipio] = useState(defaultMunicipio);
   const [areaAccion, setAreaAccion] = useState(CAMPAIGN_COPY.actionAreas[0].id);
   const [telefono, setTelefono] = useState('');
+  const [email, setEmail] = useState('');
   const [afiliadoId, setAfiliadoId] = useState('SOMOS-JUJ-0101');
   const [fechaRegistro, setFechaRegistro] = useState('');
   const [qrDataUrl, setQrDataUrl] = useState('');
@@ -59,9 +60,8 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
 
   useEffect(() => {
     if (!afiliadoId) return;
-    const payload = `https://somosjujuy.org/validar/${afiliadoId} | SOMOS Jujuy | Afiliado: ${
-      nombre || CAMPAIGN_COPY.carnetModal.cardDesign.defaultTitular
-    } | Municipio: ${municipio} | ID Oficial: ${afiliadoId}`;
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://somosjujuy.org';
+    const payload = `${baseUrl}/?validar=${encodeURIComponent(afiliadoId)}`;
 
     QRCode.toDataURL(payload, {
       width: 180,
@@ -79,7 +79,7 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombre.trim()) return;
+    if (!nombre.trim() || !email.trim()) return;
 
     setIsSubmitting(true);
     soundscape.playClick();
@@ -93,6 +93,7 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
           municipio,
           areaAccion: currentAreaObj.label,
           telefono: telefono.trim(),
+          email: email.trim(),
         }),
       });
 
@@ -352,7 +353,34 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  {CAMPAIGN_COPY.carnetModal.form.areaLabel}
+                  {CAMPAIGN_COPY.carnetModal.form.telefonoLabel}
+                </label>
+                <input
+                  type="tel"
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  placeholder={CAMPAIGN_COPY.carnetModal.form.telefonoPlaceholder}
+                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  {CAMPAIGN_COPY.carnetModal.form.emailLabel}
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder={CAMPAIGN_COPY.carnetModal.form.emailPlaceholder}
+                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>{CAMPAIGN_COPY.carnetModal.form.areaLabel}</span>
                 </label>
                 <select
                   value={areaAccion}
@@ -365,19 +393,6 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  {CAMPAIGN_COPY.carnetModal.form.telefonoLabel}
-                </label>
-                <input
-                  type="tel"
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  placeholder={CAMPAIGN_COPY.carnetModal.form.telefonoPlaceholder}
-                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] text-sm"
-                />
               </div>
 
               <button

@@ -2,6 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { sendDailySummaryEmail, isSmtpConfigured, AfiliadoReportItem } from './src/server/emailNotifier';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,10 +60,13 @@ async function initDatabase() {
           numero_afiliado VARCHAR(50) UNIQUE NOT NULL,
           nombre VARCHAR(255) NOT NULL,
           municipio VARCHAR(255) NOT NULL,
-          area_accion VARCHAR(255) DEFAULT 'General',
+          area_accion VARCHAR(255) DEFAULT 'Solo Adhesión / Participación General',
           telefono VARCHAR(100) DEFAULT '',
+          email VARCHAR(255) DEFAULT '',
           fecha_registro TIMESTAMPTZ DEFAULT NOW()
         );
+
+        ALTER TABLE afiliados ADD COLUMN IF NOT EXISTS email VARCHAR(255) DEFAULT '';
       `);
       console.log('[PostgreSQL] Conexión establecida. Esquema y secuencia numérica inicializados con éxito');
       return;
@@ -127,16 +131,17 @@ function writeJsonDatabase(data: unknown) {
 // 1. POST /api/afiliaciones - Registro y asignación de número único no repetible
 app.post('/api/afiliaciones', async (req, res) => {
   try {
-    const { nombre, municipio, areaAccion, telefono } = req.body;
+    const { nombre, municipio, areaAccion, telefono, email } = req.body;
 
-    if (!nombre || !municipio) {
-      return res.status(400).json({ error: 'Nombre y municipio son requeridos' });
+    if (!nombre || !municipio || !email) {
+      return res.status(400).json({ error: 'Nombre, municipio y correo electrónico son requeridos' });
     }
 
     const cleanNombre = String(nombre).trim();
     const cleanMunicipio = String(municipio).trim();
-    const cleanArea = String(areaAccion || 'General').trim();
+    const cleanArea = String(areaAccion || 'Solo Adhesión / Participación General').trim();
     const cleanTel = String(telefono || '').trim();
+    const cleanEmail = String(email || '').trim();
 
     // Si PostgreSQL está activo:
     if (pgPool) {
@@ -147,17 +152,17 @@ app.post('/api/afiliaciones', async (req, res) => {
         const numeroAfiliado = `SOMOS-JUJ-${formattedNum}`;
 
         const insertRes = await pgPool.query(
-          `INSERT INTO afiliados (id, numero_afiliado, nombre, municipio, area_accion, telefono, fecha_registro)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW())
-           RETURNING id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", telefono, fecha_registro as "fechaRegistro"`,
-          [numeroAfiliado, numeroAfiliado, cleanNombre, cleanMunicipio, cleanArea, cleanTel]
+          `INSERT INTO afiliados (id, numero_afiliado, nombre, municipio, area_accion, telefono, email, fecha_registro)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+           RETURNING id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", telefono, email, fecha_registro as "fechaRegistro"`,
+          [numeroAfiliado, numeroAfiliado, cleanNombre, cleanMunicipio, cleanArea, cleanTel, cleanEmail]
         );
 
         const countRes = await pgPool.query('SELECT count(*) as total FROM afiliados');
         const totalAfiliados = parseInt(countRes.rows[0].total, 10);
 
         const nuevoAfiliado = insertRes.rows[0];
-        console.log(`[Afiliación PostgreSQL] ${numeroAfiliado} - ${cleanNombre} (${cleanMunicipio})`);
+        console.log(`[Afiliación PostgreSQL] ${numeroAfiliado} - ${cleanNombre} (${cleanMunicipio}) - Email: ${cleanEmail}`);
 
         return res.status(201).json({
           success: true,
@@ -185,6 +190,7 @@ app.post('/api/afiliaciones', async (req, res) => {
       municipio: cleanMunicipio,
       areaAccion: cleanArea,
       telefono: cleanTel,
+      email: cleanEmail,
       fechaRegistro: new Date().toISOString(),
     };
 
@@ -194,7 +200,7 @@ app.post('/api/afiliaciones', async (req, res) => {
     db.afiliados.push(nuevoAfiliado);
     writeJsonDatabase(db);
 
-    console.log(`[Afiliación JSON] ${numeroAfiliado} - ${nuevoAfiliado.nombre} (${nuevoAfiliado.municipio})`);
+    console.log(`[Afiliación JSON] ${numeroAfiliado} - ${nuevoAfiliado.nombre} (${nuevoAfiliado.municipio}) - Email: ${cleanEmail}`);
 
     return res.status(201).json({
       success: true,
@@ -314,17 +320,18 @@ app.get('/api/afiliaciones/validar/:numero', async (req, res) => {
 // 4. GET /api/afiliaciones/csv - Exportación de padrón para el partido
 app.get('/api/afiliaciones/csv', async (req, res) => {
   try {
-    let csv = 'NumeroAfiliado,Nombre,Municipio,AreaAccion,Telefono,FechaRegistro\n';
+    let csv = 'NumeroAfiliado,Nombre,Municipio,AreaAccion,Telefono,Email,FechaRegistro\n';
 
     if (pgPool) {
       try {
-        const allRes = await pgPool.query('SELECT numero_afiliado, nombre, municipio, area_accion, telefono, fecha_registro FROM afiliados ORDER BY fecha_registro ASC');
-        allRes.rows.forEach((af: { numero_afiliado: string; nombre: string; municipio: string; area_accion: string; telefono: string; fecha_registro: string }) => {
+        const allRes = await pgPool.query('SELECT numero_afiliado, nombre, municipio, area_accion, telefono, email, fecha_registro FROM afiliados ORDER BY fecha_registro ASC');
+        allRes.rows.forEach((af: { numero_afiliado: string; nombre: string; municipio: string; area_accion: string; telefono: string; email?: string; fecha_registro: string }) => {
           const cleanName = `"${(af.nombre || '').replace(/"/g, '""')}"`;
           const cleanMun = `"${(af.municipio || '').replace(/"/g, '""')}"`;
           const cleanArea = `"${(af.area_accion || '').replace(/"/g, '""')}"`;
           const cleanTel = `"${(af.telefono || '').replace(/"/g, '""')}"`;
-          csv += `${af.numero_afiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${af.fecha_registro}\n`;
+          const cleanMail = `"${(af.email || '').replace(/"/g, '""')}"`;
+          csv += `${af.numero_afiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${af.fecha_registro}\n`;
         });
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -337,12 +344,13 @@ app.get('/api/afiliaciones/csv', async (req, res) => {
 
     const db = readJsonDatabase();
     const afiliados = Array.isArray(db.afiliados) ? db.afiliados : [];
-    afiliados.forEach((af: { numeroAfiliado: string; nombre: string; municipio: string; areaAccion: string; telefono: string; fechaRegistro: string }) => {
+    afiliados.forEach((af: { numeroAfiliado: string; nombre: string; municipio: string; areaAccion: string; telefono: string; email?: string; fechaRegistro: string }) => {
       const cleanName = `"${(af.nombre || '').replace(/"/g, '""')}"`;
       const cleanMun = `"${(af.municipio || '').replace(/"/g, '""')}"`;
       const cleanArea = `"${(af.areaAccion || '').replace(/"/g, '""')}"`;
       const cleanTel = `"${(af.telefono || '').replace(/"/g, '""')}"`;
-      csv += `${af.numeroAfiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${af.fechaRegistro}\n`;
+      const cleanMail = `"${(af.email || '').replace(/"/g, '""')}"`;
+      csv += `${af.numeroAfiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${af.fechaRegistro}\n`;
     });
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -352,6 +360,151 @@ app.get('/api/afiliaciones/csv', async (req, res) => {
     console.error('Error exportando CSV:', error);
     return res.status(500).json({ error: 'Error exportando CSV' });
   }
+});
+
+// 5. GET /api/afiliaciones/list - Lista de contactos para gestión y contacto territorial (con PIN opcional)
+app.get('/api/afiliaciones/list', async (req, res) => {
+  try {
+    const pin = req.headers['x-admin-pin'] || req.query.pin;
+    const requiredPin = process.env.ADMIN_PIN || 'somos2026';
+
+    if (pin && pin !== requiredPin) {
+      return res.status(401).json({ error: 'PIN de administración inválido' });
+    }
+
+    if (pgPool) {
+      try {
+        const allRes = await pgPool.query(
+          'SELECT id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", telefono, email, fecha_registro as "fechaRegistro" FROM afiliados ORDER BY fecha_registro DESC'
+        );
+        return res.json({
+          success: true,
+          total: allRes.rows.length,
+          afiliados: allRes.rows,
+          engine: 'postgresql',
+        });
+      } catch (sqlErr) {
+        console.warn('[PostgreSQL Error] Falló query en list, usando fallback JSON:', (sqlErr as Error)?.message || sqlErr);
+      }
+    }
+
+    const db = readJsonDatabase();
+    const afiliados = Array.isArray(db.afiliados) ? [...db.afiliados] : [];
+    afiliados.sort((a, b) => new Date(b.fechaRegistro || 0).getTime() - new Date(a.fechaRegistro || 0).getTime());
+
+    return res.json({
+      success: true,
+      total: afiliados.length,
+      afiliados,
+      engine: 'json',
+    });
+  } catch (error) {
+    console.error('Error listando afiliados:', error);
+    return res.status(500).json({ error: 'Error al listar contactos' });
+  }
+});
+
+// 6. GET /validar/:numero - Redirección amigable para escaneo de código QR
+app.get('/validar/:numero', (req, res) => {
+  res.redirect(`/?validar=${encodeURIComponent(req.params.numero)}`);
+});
+
+// -------------------------------------------------------------
+// SERVICIO DE NOTIFICACIÓN DIARIA POR CORREO ELECTRÓNICO
+// Envía un email al partido (partidosomosjujuy@gmail.com)
+// una vez al día cuando se haya registrado gente ese día.
+// -------------------------------------------------------------
+
+async function getAllAfiliadosForReport(): Promise<AfiliadoReportItem[]> {
+  if (pgPool) {
+    try {
+      const res = await pgPool.query(
+        'SELECT id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", telefono, email, fecha_registro as "fechaRegistro" FROM afiliados ORDER BY fecha_registro ASC'
+      );
+      return res.rows;
+    } catch (err) {
+      console.warn('[PostgreSQL Report Warning] Falló query en reporte, usando fallback JSON:', err);
+    }
+  }
+
+  const db = readJsonDatabase();
+  return Array.isArray(db.afiliados) ? db.afiliados : [];
+}
+
+async function triggerDailyReport(forceSend = false): Promise<{ success: boolean; configured: boolean; message: string; count: number }> {
+  try {
+    const todos = await getAllAfiliadosForReport();
+    const now = new Date();
+    // Fecha local en formato YYYY-MM-DD
+    const todayStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Jujuy' });
+
+    const db = readJsonDatabase();
+    if (!forceSend && db.lastDailyReportDate === todayStr) {
+      return {
+        success: true,
+        configured: isSmtpConfigured(),
+        message: `El reporte diario de hoy (${todayStr}) ya fue enviado previamente.`,
+        count: 0,
+      };
+    }
+
+    // Filtrar inscriptos del día
+    const inscriptosHoy = todos.filter((a) => {
+      if (!a.fechaRegistro) return false;
+      const regDate = new Date(a.fechaRegistro).toLocaleDateString('en-CA', { timeZone: 'America/Argentina/Jujuy' });
+      return regDate === todayStr;
+    });
+
+    if (inscriptosHoy.length === 0 && !forceSend) {
+      console.log(`[Notificador Diario] No hubo nuevos inscriptos hoy (${todayStr}). No se envía correo.`);
+      return {
+        success: true,
+        configured: isSmtpConfigured(),
+        message: `No hubo nuevos inscriptos hoy (${todayStr}). No se envía correo.`,
+        count: 0,
+      };
+    }
+
+    // Si es forzado y no hay de hoy, tomar los últimos registrados como muestra
+    const listToSend = inscriptosHoy.length > 0 ? inscriptosHoy : todos.slice(-5);
+
+    const emailResult = await sendDailySummaryEmail(listToSend, todayStr, todos.length);
+
+    if (emailResult.success) {
+      db.lastDailyReportDate = todayStr;
+      writeJsonDatabase(db);
+    }
+
+    return {
+      success: emailResult.success,
+      configured: emailResult.configured,
+      message: emailResult.message,
+      count: listToSend.length,
+    };
+  } catch (error) {
+    console.error('[Notificador Diario] Error en triggerDailyReport:', error);
+    return {
+      success: false,
+      configured: isSmtpConfigured(),
+      message: `Error al procesar reporte: ${(error as Error)?.message || error}`,
+      count: 0,
+    };
+  }
+}
+
+// 7. POST /api/afiliaciones/enviar-resumen-diario - Forzar o probar envío del resumen diario
+app.post('/api/afiliaciones/enviar-resumen-diario', async (req, res) => {
+  const result = await triggerDailyReport(true);
+  return res.json(result);
+});
+
+// 8. GET /api/afiliaciones/smtp-status - Estado de configuración del correo
+app.get('/api/afiliaciones/smtp-status', (req, res) => {
+  return res.json({
+    configured: isSmtpConfigured(),
+    recipient: process.env.NOTIFICATION_EMAIL || 'partidosomosjujuy@gmail.com',
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  });
 });
 
 // -------------------------------------------------------------
@@ -375,8 +528,31 @@ async function startServer() {
     });
   }
 
+  // Tarea programada en segundo plano: verificar cada 30 minutos
+  // Si son las 21:00 hs o más en Jujuy y hubo gente registrada hoy, envía el resumen automáticamente
+  setInterval(async () => {
+    try {
+      const jujuyHour = parseInt(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Argentina/Jujuy',
+          hour: 'numeric',
+          hour12: false,
+        }).format(new Date()),
+        10
+      );
+
+      // Enviar reporte al final de la jornada (a partir de las 21:00 hs)
+      if (jujuyHour >= 21) {
+        await triggerDailyReport(false);
+      }
+    } catch (err) {
+      console.warn('[Scheduler Error]', err);
+    }
+  }, 30 * 60 * 1000);
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Servidor SOMOS Jujuy] Escuchando en http://localhost:${PORT}`);
+    console.log(`[Notificador Diario] Configurado para enviar resumen a ${process.env.NOTIFICATION_EMAIL || 'partidosomosjujuy@gmail.com'} una vez al día si hay registros.`);
   });
 }
 

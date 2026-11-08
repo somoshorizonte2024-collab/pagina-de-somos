@@ -71,9 +71,11 @@ export const CAMPAIGN_COPY = {
       nombreLabel: 'Nombre y Apellido *',
       nombrePlaceholder: 'Ej: Marcelo Morales',
       municipioLabel: 'Municipio / Barrio donde vivís *',
-      areaLabel: '¿En qué te gustaría militar?',
-      telefonoLabel: 'WhatsApp (Opcional)',
-      telefonoPlaceholder: 'Para avisos urgentes y novedades',
+      telefonoLabel: 'WhatsApp / Celular (Opcional)',
+      telefonoPlaceholder: 'Ej: 388 123-4567',
+      emailLabel: 'Correo Electrónico * (Obligatorio, para coordinar la afiliación en papel)',
+      emailPlaceholder: 'Ej: tuemail@gmail.com',
+      areaLabel: '¿Te gustaría militar o participar en algún área? (Opcional)',
       submitButton: 'Generar Mi Credencial',
       submittingButton: 'Conectando con el Padrón Digital...',
       disclaimer:
@@ -95,7 +97,7 @@ export const CAMPAIGN_COPY = {
       whatsappButtonText: (afiliadoId: string) =>
         `Escribir a SOMOS Jujuy con mi Credencial #${afiliadoId}`,
       whatsappMessageTemplate: (municipio: string, afiliadoId: string, nombre: string, area: string) =>
-        `¡Hola SOMOS Jujuy! Me acabo de sumar desde ${municipio}. Mi Credencial Digital es la N° ${afiliadoId} a nombre de ${nombre}. Quiero empezar a militar y participar en el área de "${area}".`,
+        `¡Hola SOMOS Jujuy! Me acabo de sumar desde ${municipio}. Mi Credencial Digital es la N° ${afiliadoId} a nombre de ${nombre}. Mi interés de participación es: "${area}".`,
       downloadButton: 'Descargar Credencial (PNG)',
       downloadingButton: 'Generando...',
       shareButton: 'Invitar a un vecino',
@@ -105,8 +107,9 @@ export const CAMPAIGN_COPY = {
     },
   },
 
-  // 5. Áreas de Participación / Militancia Disponibles
+  // 5. Áreas de Participación / Militancia Disponibles (Opcionales)
   actionAreas: [
+    { id: 'adhesion_general', label: 'Solo Adhesión Ciudadana (General)' },
     { id: 'economia', label: 'Economía, Salarios y Trabajo Joven' },
     { id: 'territorio', label: 'Organización Barrial y Territorial' },
     { id: 'guerrilla_digital', label: 'Guerrilla Digital y Comunicación' },
