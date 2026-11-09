@@ -2,13 +2,13 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { sendDailySummaryEmail, isSmtpConfigured, AfiliadoReportItem } from './src/server/emailNotifier';
+import { sendDailySummaryEmail, isSmtpConfigured, type AfiliadoReportItem } from './src/server/emailNotifier.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 // Hardening de seguridad HTTP y protección de información del servidor
 app.disable('x-powered-by');
@@ -410,94 +410,19 @@ app.get('/api/afiliaciones/validar/:numero', async (req, res) => {
   }
 });
 
-// 4. GET /api/afiliaciones/csv - Exportación de padrón para el partido (Protegido por PIN de Administración y sanitizado contra inyección CSV)
-app.get('/api/afiliaciones/csv', async (req, res) => {
-  try {
-    if (!verifyAdminPin(req)) {
-      return res.status(401).json({
-        error: 'Acceso no autorizado. Se requiere PIN de administración (?pin= o header x-admin-pin).',
-      });
-    }
-
-    let csv = 'NumeroAfiliado,Nombre,Municipio,AreaAccion,Telefono,Email,FechaRegistro\n';
-
-    if (pgPool) {
-      try {
-        const allRes = await pgPool.query('SELECT numero_afiliado, nombre, municipio, area_accion, telefono, email, fecha_registro FROM afiliados ORDER BY fecha_registro ASC');
-        allRes.rows.forEach((af: { numero_afiliado: string; nombre: string; municipio: string; area_accion: string; telefono: string; email?: string; fecha_registro: string }) => {
-          const cleanName = sanitizeCsvField(af.nombre);
-          const cleanMun = sanitizeCsvField(af.municipio);
-          const cleanArea = sanitizeCsvField(af.area_accion);
-          const cleanTel = sanitizeCsvField(af.telefono);
-          const cleanMail = sanitizeCsvField(af.email || '');
-          csv += `${af.numero_afiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${af.fecha_registro}\n`;
-        });
-
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', 'attachment; filename="Padron_Afiliados_SOMOS_Jujuy.csv"');
-        return res.send(csv);
-      } catch (sqlErr) {
-        console.warn('[PostgreSQL Error] Falló query en csv, usando fallback JSON:', (sqlErr as Error)?.message || sqlErr);
-      }
-    }
-
-    const db = readJsonDatabase();
-    const afiliados = Array.isArray(db.afiliados) ? db.afiliados : [];
-    afiliados.forEach((af: { numeroAfiliado: string; nombre: string; municipio: string; areaAccion: string; telefono: string; email?: string; fechaRegistro: string }) => {
-      const cleanName = sanitizeCsvField(af.nombre);
-      const cleanMun = sanitizeCsvField(af.municipio);
-      const cleanArea = sanitizeCsvField(af.areaAccion);
-      const cleanTel = sanitizeCsvField(af.telefono);
-      const cleanMail = sanitizeCsvField(af.email || '');
-      csv += `${af.numeroAfiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${af.fechaRegistro}\n`;
-    });
-
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="Padron_Afiliados_SOMOS_Jujuy.csv"');
-    return res.send(csv);
-  } catch (error) {
-    console.error('Error exportando CSV:', error);
-    return res.status(500).json({ error: 'Error exportando CSV' });
-  }
+// 4. RUTAS WEB DE DESCARGA DESHABILITADAS POR COMPLETO (PRIVACIDAD ESTRICTA)
+// Por seguridad de los datos personales, la base de datos ya NO se expone en la web.
+// Se adjunta automáticamente en formato .csv al correo oficial del partido (partidosomosjujuy@gmail.com).
+app.get('/api/afiliaciones/csv', (_req, res) => {
+  return res.status(404).json({
+    error: 'Ruta web deshabilitada por seguridad. La base de datos completa se envía adjunta en formato .csv al correo oficial partidosomosjujuy@gmail.com.',
+  });
 });
 
-// 5. GET /api/afiliaciones/list - Lista de contactos protegida por PIN
-app.get('/api/afiliaciones/list', async (req, res) => {
-  try {
-    if (!verifyAdminPin(req)) {
-      return res.status(401).json({ error: 'Acceso no autorizado. Se requiere PIN de administración.' });
-    }
-
-    if (pgPool) {
-      try {
-        const allRes = await pgPool.query(
-          'SELECT id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", telefono, email, fecha_registro as "fechaRegistro" FROM afiliados ORDER BY fecha_registro DESC'
-        );
-        return res.json({
-          success: true,
-          total: allRes.rows.length,
-          afiliados: allRes.rows,
-          engine: 'postgresql',
-        });
-      } catch (sqlErr) {
-        console.warn('[PostgreSQL Error] Falló query en list, usando fallback JSON:', (sqlErr as Error)?.message || sqlErr);
-      }
-    }
-
-    const db = readJsonDatabase();
-    const afiliados = Array.isArray(db.afiliados) ? [...db.afiliados] : [];
-    afiliados.sort((a, b) => new Date(b.fechaRegistro || 0).getTime() - new Date(a.fechaRegistro || 0).getTime());
-
-    return res.json({
-      success: true,
-      total: afiliados.length,
-      afiliados,
-      engine: 'json',
-    });
-  } catch (error) {
-    console.error('Error listando afiliados:', error);
-    return res.status(500).json({ error: 'Error al listar contactos' });
-  }
+app.get('/api/afiliaciones/list', (_req, res) => {
+  return res.status(404).json({
+    error: 'Ruta web deshabilitada por seguridad. Los datos de contacto se envían de forma privada y exclusiva al correo oficial de SOMOS Jujuy.',
+  });
 });
 
 // 6. GET /validar/:numero - Redirección amigable para escaneo de código QR
@@ -564,7 +489,8 @@ async function triggerDailyReport(forceSend = false): Promise<{ success: boolean
     // Si es forzado y no hay de hoy, tomar los últimos registrados como muestra
     const listToSend = inscriptosHoy.length > 0 ? inscriptosHoy : todos.slice(-5);
 
-    const emailResult = await sendDailySummaryEmail(listToSend, todayStr, todos.length);
+    // Enviar el correo con los registrados del día y adjuntar la base de datos CSV completa actualizada
+    const emailResult = await sendDailySummaryEmail(listToSend, todayStr, todos.length, todos);
 
     if (emailResult.success) {
       db.lastDailyReportDate = todayStr;

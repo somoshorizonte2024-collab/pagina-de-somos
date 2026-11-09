@@ -34,22 +34,17 @@ Tu aplicación está programada con un **sistema dual inteligente**:
 
 ## 2. ¿Cómo recibir los datos y contactar a las personas?
 
-Hay **3 maneras sencillas y directas**:
+La privacidad de los datos es total: **no existe ninguna ruta web pública de descarga** para evitar que terceros puedan acceder o descargar el padrón.
 
-### A) Por Correo Electrónico Diario Automático (El método principal)
+### A) Base de Datos Adjunta en el Correo Diario Automático (El método exclusivo)
 - Todos los días a las **21:00 hs (hora Jujuy/Argentina)**, el servidor verifica si hubo nuevos inscriptos.
 - **Si hubo registros ese día**, envía automáticamente un correo a **`partidosomosjujuy@gmail.com`** con:
-  - Una tabla con: **Nombre y Apellido**, **Email**, **WhatsApp / Teléfono**, **Municipio / Barrio**, **Área de Acción**, y **Número de Credencial**.
-  - Total histórico acumulado de adherentes.
-- Si un día no se registró nadie, no envía correos innecesarios.
+  1. **Tabla visual rápida:** Nombre y Apellido, Email, WhatsApp / Teléfono, Municipio y Área de militancia/adhesión.
+  2. **Archivo CSV adjunto:** `Padron_Afiliados_SOMOS_Jujuy_YYYY-MM-DD.csv`, con todos los datos actualizados del padrón listos para abrir en **Microsoft Excel** o **Google Sheets**.
+- **Seguridad:** Únicamente las personas con acceso a la casilla oficial `partidosomosjujuy@gmail.com` reciben el archivo. Las rutas web de descarga como `/api/afiliaciones/csv` están deshabilitadas permanentemente.
 
-### B) Descarga directa de Planilla Excel / CSV (Sin panel público)
-- Puedes descargar en cualquier momento la lista completa en formato compatible con Excel o Google Sheets accediendo a:
-  `https://tudominio.com/api/afiliaciones/csv`
-- Se descargará un archivo `.csv` con todas las columnas (`NumeroAfiliado`, `Nombre`, `Municipio`, `AreaAccion`, `Telefono`, `Email`, `FechaRegistro`) para imprimir las fichas o coordinar las firmas.
-
-### C) Archivo físico permanente en el VPS
-- El archivo se guarda en el disco del VPS en:
+### B) Archivo físico permanente en el disco de tu VPS
+- Como administrador del VPS, también puedes inspeccionar o respaldar el archivo directamente en la consola del servidor:
   ```bash
   cat /var/www/somos-jujuy/data/afiliaciones.json
   ```

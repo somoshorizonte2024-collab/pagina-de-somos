@@ -20,6 +20,30 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function sanitizeCsvField(val: string): string {
+  const str = String(val || '').replace(/"/g, '""');
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `"'${str}"`;
+  }
+  return `"${str}"`;
+}
+
+export function generateAfiliadosCsv(afiliados: AfiliadoReportItem[]): string {
+  let csv = 'NumeroAfiliado,Nombre,Municipio,AreaAccion,Telefono,Email,FechaRegistro\n';
+  afiliados.forEach((af) => {
+    const cleanNum = sanitizeCsvField(af.numeroAfiliado);
+    const cleanName = sanitizeCsvField(af.nombre);
+    const cleanMun = sanitizeCsvField(af.municipio);
+    const cleanArea = sanitizeCsvField(af.areaAccion || 'Solo Adhesión Ciudadana (General)');
+    const cleanTel = sanitizeCsvField(af.telefono);
+    const cleanMail = sanitizeCsvField(af.email || '');
+    const cleanDate = sanitizeCsvField(af.fechaRegistro);
+    csv += `${cleanNum},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${cleanDate}\n`;
+  });
+  // Retorna con UTF-8 BOM para que Microsoft Excel abra los acentos y caracteres especiales perfectamente
+  return '\uFEFF' + csv;
+}
+
 export function isSmtpConfigured(): boolean {
   return Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
 }
@@ -27,7 +51,8 @@ export function isSmtpConfigured(): boolean {
 export async function sendDailySummaryEmail(
   afiliadosHoy: AfiliadoReportItem[],
   dateStr: string,
-  totalHistorico: number
+  totalHistorico: number,
+  todosAfiliados?: AfiliadoReportItem[]
 ): Promise<{ success: boolean; configured: boolean; message: string }> {
   const recipient = process.env.NOTIFICATION_EMAIL || 'partidosomosjujuy@gmail.com';
 
@@ -50,6 +75,10 @@ export async function sendDailySummaryEmail(
       pass: process.env.SMTP_PASS,
     },
   });
+
+  const listaCompleta = todosAfiliados && todosAfiliados.length > 0 ? todosAfiliados : afiliadosHoy;
+  const csvAttachmentContent = generateAfiliadosCsv(listaCompleta);
+  const csvFilename = `Padron_Afiliados_SOMOS_Jujuy_${dateStr}.csv`;
 
   const rowsHtml = afiliadosHoy
     .map(
@@ -91,7 +120,7 @@ export async function sendDailySummaryEmail(
       <meta charset="utf-8">
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f1f5f9; }
-        .container { max-width: 800px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .container { max-width: 820px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .header { background: #0C2340; color: #ffffff; padding: 24px; text-align: center; border-bottom: 4px solid #EE007C; }
         .content { padding: 24px; }
         .badge { background: #00AEEF; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; }
@@ -140,7 +169,20 @@ export async function sendDailySummaryEmail(
             </table>
           </div>
 
-          <div style="margin-top: 24px; padding: 16px; background: #e0f2fe; border-left: 4px solid #00AEEF; border-radius: 6px;">
+          <!-- Cuadro de Archivo Adjunto Seguro -->
+          <div style="margin-top: 20px; padding: 16px; background: #ecfdf5; border-left: 4px solid #10b981; border-radius: 8px;">
+            <p style="margin: 0; font-size: 14px; font-weight: bold; color: #065f46;">
+              📎 Base de Datos Adjunta: <code>${csvFilename}</code>
+            </p>
+            <p style="margin: 6px 0 0; font-size: 12px; color: #047857; line-height: 1.4;">
+              Adjuntamos el archivo <strong>.csv</strong> actualizado con los <strong>${listaCompleta.length} registros del padrón histórico</strong>, listo para descargar y abrir directamente en <strong>Microsoft Excel</strong> o <strong>Google Sheets</strong>.
+            </p>
+            <p style="margin: 6px 0 0; font-size: 11px; color: #64748b; font-style: italic;">
+              🔒 Nota de Privacidad: Por seguridad, la ruta de descarga web pública ha sido deshabilitada por completo. Solo los destinatarios autorizados de esta casilla oficial reciben este archivo.
+            </p>
+          </div>
+
+          <div style="margin-top: 16px; padding: 12px 16px; background: #e0f2fe; border-left: 4px solid #00AEEF; border-radius: 6px;">
             <p style="margin: 0; font-size: 13px; color: #0369a1;">
               <strong>Padrón Histórico Acumulado:</strong> ${totalHistorico} personas registradas en total.
             </p>
@@ -149,7 +191,7 @@ export async function sendDailySummaryEmail(
 
         <div class="footer">
           <p style="margin: 0;">Partido Político SOMOS Jujuy · Padrón Digital Comunitario</p>
-          <p style="margin: 4px 0 0; color: #94a3b8;">Este reporte se genera automáticamente una vez al día cuando se registra gente nueva.</p>
+          <p style="margin: 4px 0 0; color: #94a3b8;">Este reporte con archivo adjunto se genera automáticamente una vez al día cuando se registra gente nueva.</p>
         </div>
       </div>
     </body>
@@ -162,13 +204,20 @@ export async function sendDailySummaryEmail(
       to: recipient,
       subject: `📢 Resumen Diario SOMOS Jujuy: ${afiliadosHoy.length} nuevo(s) inscripto(s) hoy (${dateStr})`,
       html,
+      attachments: [
+        {
+          filename: csvFilename,
+          content: csvAttachmentContent,
+          contentType: 'text/csv; charset=utf-8',
+        },
+      ],
     });
 
-    console.log(`[Notificador Diario] Correo enviado exitosamente a ${recipient} con ${afiliadosHoy.length} inscriptos.`);
+    console.log(`[Notificador Diario] Correo enviado exitosamente a ${recipient} con ${afiliadosHoy.length} inscriptos y archivo ${csvFilename} adjunto.`);
     return {
       success: true,
       configured: true,
-      message: `Correo enviado a ${recipient} con ${afiliadosHoy.length} inscriptos del día.`,
+      message: `Correo enviado a ${recipient} con ${afiliadosHoy.length} inscriptos del día y archivo .csv adjunto.`,
     };
   } catch (err) {
     console.error('[Notificador Diario] Error enviando correo:', err);
