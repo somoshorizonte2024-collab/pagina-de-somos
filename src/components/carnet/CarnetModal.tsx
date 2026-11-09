@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { soundscape } from '../../audio/soundscape';
 import { CAMPAIGN_COPY } from '../../data/campaignCopy';
+import { SomosLogo } from '../ui/SomosLogo';
+import logoImg from '../../assets/images/somos_logo_oficial.png';
 
 interface CarnetModalProps {
   isOpen: boolean;
@@ -179,31 +181,25 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
     ctx.lineWidth = 4;
     ctx.strokeRect(60, 40, 1080, 680);
 
-    // Encabezado SOMOS
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 64px Montserrat, sans-serif';
-    ctx.fillText('SOM', 100, 150);
+    // Encabezado con Logotipo Oficial SOMOS
+    const logo = new Image();
+    logo.src = logoImg;
+    await new Promise((resolve) => {
+      if (logo.complete) resolve(null);
+      else {
+        logo.onload = () => resolve(null);
+        logo.onerror = () => resolve(null);
+      }
+    });
 
-    // Corazón Patrio
-    ctx.fillStyle = '#00AEEF';
-    ctx.beginPath();
-    ctx.arc(285, 120, 24, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(285, 120, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#F8C300';
-    ctx.beginPath();
-    ctx.arc(285, 120, 9, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('S', 320, 150);
-
-    ctx.fillStyle = '#00AEEF';
-    ctx.font = 'bold 24px Montserrat, sans-serif';
-    ctx.fillText(CAMPAIGN_COPY.brand.province, 100, 185);
+    if (logo.width) {
+      // Dimensiones proporcionales del isotipo oficial
+      ctx.drawImage(logo, 100, 95, 330, 68);
+    } else {
+      ctx.fillStyle = '#EE007C';
+      ctx.font = '900 64px Montserrat, sans-serif';
+      ctx.fillText('SOMOS', 100, 150);
+    }
 
     // Título de la Credencial
     ctx.fillStyle = '#F8C300';
@@ -292,14 +288,13 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
         {/* Cabecera del Modal */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0C2340]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#EE007C] flex items-center justify-center text-white">
-              <UserCheck className="w-5 h-5" />
-            </div>
+            <SomosLogo size="sm" showSubtitle={false} />
+            <div className="h-6 w-px bg-white/15" />
             <div>
-              <h2 className="text-lg font-bold font-montserrat text-white">
+              <h2 className="text-sm sm:text-base font-bold font-montserrat text-white leading-tight">
                 {CAMPAIGN_COPY.carnetModal.title}
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-[11px] text-slate-400">
                 {CAMPAIGN_COPY.carnetModal.description}
               </p>
             </div>
@@ -428,16 +423,7 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
 
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="flex items-center font-black font-montserrat text-2xl text-white tracking-wider">
-                    <span>SOM</span>
-                    <span className="inline-block w-5 h-5 mx-0.5 rounded-full bg-[#00AEEF] border border-white flex items-center justify-center">
-                      <span className="w-2 h-2 rounded-full bg-[#F8C300]" />
-                    </span>
-                    <span>S</span>
-                  </div>
-                  <p className="text-[10px] font-bold tracking-[0.25em] text-[#00AEEF] uppercase">
-                    {CAMPAIGN_COPY.carnetModal.cardDesign.headerCategory}
-                  </p>
+                  <SomosLogo size="xs" />
                 </div>
                 <div className="text-right">
                   <span className="inline-block px-2 py-0.5 bg-[#F8C300]/10 border border-[#F8C300]/40 rounded text-[10px] font-bold text-[#F8C300] uppercase">

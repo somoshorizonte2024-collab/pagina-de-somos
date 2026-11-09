@@ -32,26 +32,24 @@ Tu aplicación está programada con un **sistema dual inteligente**:
 
 ---
 
-## 2. ¿Cómo acceder a la lista y contactar a las personas?
+## 2. ¿Cómo recibir los datos y contactar a las personas?
 
-Hay **3 maneras sencillas** de contactar a la gente registrada:
+Hay **3 maneras sencillas y directas**:
 
-### A) Desde la propia Web (Panel de Gestión Territorial)
-1. En la barra superior de la página web, haz clic en el ícono de **Padrón / Usuarios** (junto a los íconos de redes sociales).
-2. Ingresa el PIN de seguridad (por defecto: `somos2026`).
-3. Verás:
-   - El total de personas registradas en toda la provincia.
-   - Buscador por nombre, municipio o área de acción.
-   - **Botón verde de WhatsApp directo:** Al hacer clic en un vecino, abre automáticamente WhatsApp Web con un mensaje personalizado:
-     > *"¡Hola [Nombre]! Te escribimos desde SOMOS Jujuy respecto a tu Credencial #[Número]... Queríamos sumarte a las actividades en [Municipio]..."*
+### A) Por Correo Electrónico Diario Automático (El método principal)
+- Todos los días a las **21:00 hs (hora Jujuy/Argentina)**, el servidor verifica si hubo nuevos inscriptos.
+- **Si hubo registros ese día**, envía automáticamente un correo a **`partidosomosjujuy@gmail.com`** con:
+  - Una tabla con: **Nombre y Apellido**, **Email**, **WhatsApp / Teléfono**, **Municipio / Barrio**, **Área de Acción**, y **Número de Credencial**.
+  - Total histórico acumulado de adherentes.
+- Si un día no se registró nadie, no envía correos innecesarios.
 
-### B) Descarga directa de Planilla Excel / CSV
-- En el panel de gestión, haz clic en **"Descargar Excel / CSV"** (o entra directo a `https://tudominio.com/api/afiliaciones/csv`).
-- Se descargará un archivo `.csv` con todas las columnas (`NumeroAfiliado`, `Nombre`, `Municipio`, `AreaAccion`, `Telefono`, `FechaRegistro`).
-- Puedes abrirlo directamente con **Microsoft Excel** o importarlo en **Google Sheets** para que los coordinadores territoriales organicen las llamadas.
+### B) Descarga directa de Planilla Excel / CSV (Sin panel público)
+- Puedes descargar en cualquier momento la lista completa en formato compatible con Excel o Google Sheets accediendo a:
+  `https://tudominio.com/api/afiliaciones/csv`
+- Se descargará un archivo `.csv` con todas las columnas (`NumeroAfiliado`, `Nombre`, `Municipio`, `AreaAccion`, `Telefono`, `Email`, `FechaRegistro`) para imprimir las fichas o coordinar las firmas.
 
-### C) Archivo físico en el servidor
-- Puedes descargar o inspeccionar directamente el archivo en tu VPS:
+### C) Archivo físico permanente en el VPS
+- El archivo se guarda en el disco del VPS en:
   ```bash
   cat /var/www/somos-jujuy/data/afiliaciones.json
   ```

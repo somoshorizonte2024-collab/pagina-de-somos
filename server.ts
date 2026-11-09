@@ -10,7 +10,63 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+// Hardening de seguridad HTTP y protección de información del servidor
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Límite de carga útil JSON para prevenir ataques de denegación de servicio por memoria
+app.use(express.json({ limit: '50kb' }));
+
+// Limitador de tasa (Rate Limiting) en memoria para prevenir spam automatizado
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function isRateLimited(ip: string, maxRequests = 10, windowMs = 10 * 60 * 1000): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now > entry.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
+    return false;
+  }
+
+  if (entry.count >= maxRequests) {
+    return true;
+  }
+
+  entry.count++;
+  return false;
+}
+
+// Limpieza periódica de entradas expiradas en el mapa de tasa
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap.entries()) {
+    if (now > entry.resetTime) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, 15 * 60 * 1000);
+
+// Helper para sanitizar celdas CSV y prevenir inyección de fórmulas (CSV / Formula Injection)
+function sanitizeCsvField(val: string): string {
+  const str = String(val || '').replace(/"/g, '""');
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `"'${str}"`;
+  }
+  return `"${str}"`;
+}
+
+// Helper para validar PIN de administración en rutas sensibles
+function verifyAdminPin(req: express.Request): boolean {
+  const pin = req.headers['x-admin-pin'] || req.query.pin || (req.body && req.body.pin);
+  const requiredPin = process.env.ADMIN_PIN || 'somos2026';
+  return Boolean(pin && pin === requiredPin);
+}
 
 // -------------------------------------------------------------
 // BASE DE DATOS DUAL: POSTGRESQL (PRODUCCIÓN / CLOUD) + JSON PERSISTENTE (LOCAL)
@@ -131,6 +187,12 @@ function writeJsonDatabase(data: unknown) {
 // 1. POST /api/afiliaciones - Registro y asignación de número único no repetible
 app.post('/api/afiliaciones', async (req, res) => {
   try {
+    // Control de tasa por dirección IP (anti-spam / anti-bot)
+    const clientIp = req.headers['x-forwarded-for']?.toString().split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+    if (isRateLimited(clientIp, 10, 10 * 60 * 1000)) {
+      return res.status(429).json({ error: 'Demasiadas solicitudes de registro desde esta conexión. Por favor espere unos minutos.' });
+    }
+
     const { nombre, municipio, areaAccion, telefono, email } = req.body;
 
     if (!nombre || !municipio || !email) {
@@ -139,9 +201,33 @@ app.post('/api/afiliaciones', async (req, res) => {
 
     const cleanNombre = String(nombre).trim();
     const cleanMunicipio = String(municipio).trim();
-    const cleanArea = String(areaAccion || 'Solo Adhesión / Participación General').trim();
+    const cleanArea = String(areaAccion || 'Solo Adhesión Ciudadana (General)').trim();
     const cleanTel = String(telefono || '').trim();
-    const cleanEmail = String(email || '').trim();
+    const cleanEmail = String(email || '').trim().toLowerCase();
+
+    // Validación de longitudes para evitar desbordes o inyecciones masivas
+    if (cleanNombre.length < 2 || cleanNombre.length > 80) {
+      return res.status(400).json({ error: 'El nombre debe tener entre 2 y 80 caracteres' });
+    }
+    if (cleanMunicipio.length < 2 || cleanMunicipio.length > 80) {
+      return res.status(400).json({ error: 'El municipio debe tener entre 2 y 80 caracteres' });
+    }
+    if (cleanArea.length > 100) {
+      return res.status(400).json({ error: 'Área de acción demasiado extensa' });
+    }
+
+    // Validación estricta de formato de correo electrónico
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (cleanEmail.length > 120 || !emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Por favor ingrese un correo electrónico válido' });
+    }
+
+    // Validación de teléfono si fue proporcionado (opcional)
+    if (cleanTel) {
+      if (cleanTel.length > 30 || !/^[0-9+\s().-]{6,30}$/.test(cleanTel)) {
+        return res.status(400).json({ error: 'Formato de teléfono o WhatsApp inválido' });
+      }
+    }
 
     // Si PostgreSQL está activo:
     if (pgPool) {
@@ -263,16 +349,22 @@ app.get('/api/afiliaciones/stats', async (req, res) => {
   }
 });
 
-// 3. GET /api/afiliaciones/validar/:numero - Validación pública de credenciales
+// 3. GET /api/afiliaciones/validar/:numero - Validación pública de credenciales (con sanitización de entrada)
 app.get('/api/afiliaciones/validar/:numero', async (req, res) => {
   try {
     const { numero } = req.params;
+    const cleanNumero = String(numero || '').trim();
+
+    // Validación estricta del identificador de carnet (previene inyecciones o parámetros maliciosos)
+    if (!cleanNumero || !/^[A-Za-z0-9\-]{3,35}$/.test(cleanNumero)) {
+      return res.status(400).json({ valid: false, message: 'Formato de credencial inválido' });
+    }
 
     if (pgPool) {
       try {
         const findRes = await pgPool.query(
           'SELECT id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", fecha_registro as "fechaRegistro" FROM afiliados WHERE UPPER(numero_afiliado) = UPPER($1)',
-          [numero]
+          [cleanNumero]
         );
 
         if (findRes.rows.length === 0) {
@@ -280,6 +372,7 @@ app.get('/api/afiliaciones/validar/:numero', async (req, res) => {
         }
 
         const row = findRes.rows[0];
+        // Solo expone datos no sensibles para validación de la credencial
         return res.json({
           valid: true,
           numeroAfiliado: row.numeroAfiliado,
@@ -296,7 +389,7 @@ app.get('/api/afiliaciones/validar/:numero', async (req, res) => {
     const db = readJsonDatabase();
     const afiliados = Array.isArray(db.afiliados) ? db.afiliados : [];
     const encontrado = afiliados.find(
-      (af: { numeroAfiliado: string }) => af.numeroAfiliado?.toUpperCase() === numero.toUpperCase()
+      (af: { numeroAfiliado: string }) => af.numeroAfiliado?.toUpperCase() === cleanNumero.toUpperCase()
     );
 
     if (!encontrado) {
@@ -317,20 +410,26 @@ app.get('/api/afiliaciones/validar/:numero', async (req, res) => {
   }
 });
 
-// 4. GET /api/afiliaciones/csv - Exportación de padrón para el partido
+// 4. GET /api/afiliaciones/csv - Exportación de padrón para el partido (Protegido por PIN de Administración y sanitizado contra inyección CSV)
 app.get('/api/afiliaciones/csv', async (req, res) => {
   try {
+    if (!verifyAdminPin(req)) {
+      return res.status(401).json({
+        error: 'Acceso no autorizado. Se requiere PIN de administración (?pin= o header x-admin-pin).',
+      });
+    }
+
     let csv = 'NumeroAfiliado,Nombre,Municipio,AreaAccion,Telefono,Email,FechaRegistro\n';
 
     if (pgPool) {
       try {
         const allRes = await pgPool.query('SELECT numero_afiliado, nombre, municipio, area_accion, telefono, email, fecha_registro FROM afiliados ORDER BY fecha_registro ASC');
         allRes.rows.forEach((af: { numero_afiliado: string; nombre: string; municipio: string; area_accion: string; telefono: string; email?: string; fecha_registro: string }) => {
-          const cleanName = `"${(af.nombre || '').replace(/"/g, '""')}"`;
-          const cleanMun = `"${(af.municipio || '').replace(/"/g, '""')}"`;
-          const cleanArea = `"${(af.area_accion || '').replace(/"/g, '""')}"`;
-          const cleanTel = `"${(af.telefono || '').replace(/"/g, '""')}"`;
-          const cleanMail = `"${(af.email || '').replace(/"/g, '""')}"`;
+          const cleanName = sanitizeCsvField(af.nombre);
+          const cleanMun = sanitizeCsvField(af.municipio);
+          const cleanArea = sanitizeCsvField(af.area_accion);
+          const cleanTel = sanitizeCsvField(af.telefono);
+          const cleanMail = sanitizeCsvField(af.email || '');
           csv += `${af.numero_afiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${af.fecha_registro}\n`;
         });
 
@@ -345,11 +444,11 @@ app.get('/api/afiliaciones/csv', async (req, res) => {
     const db = readJsonDatabase();
     const afiliados = Array.isArray(db.afiliados) ? db.afiliados : [];
     afiliados.forEach((af: { numeroAfiliado: string; nombre: string; municipio: string; areaAccion: string; telefono: string; email?: string; fechaRegistro: string }) => {
-      const cleanName = `"${(af.nombre || '').replace(/"/g, '""')}"`;
-      const cleanMun = `"${(af.municipio || '').replace(/"/g, '""')}"`;
-      const cleanArea = `"${(af.areaAccion || '').replace(/"/g, '""')}"`;
-      const cleanTel = `"${(af.telefono || '').replace(/"/g, '""')}"`;
-      const cleanMail = `"${(af.email || '').replace(/"/g, '""')}"`;
+      const cleanName = sanitizeCsvField(af.nombre);
+      const cleanMun = sanitizeCsvField(af.municipio);
+      const cleanArea = sanitizeCsvField(af.areaAccion);
+      const cleanTel = sanitizeCsvField(af.telefono);
+      const cleanMail = sanitizeCsvField(af.email || '');
       csv += `${af.numeroAfiliado},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${af.fechaRegistro}\n`;
     });
 
@@ -362,14 +461,11 @@ app.get('/api/afiliaciones/csv', async (req, res) => {
   }
 });
 
-// 5. GET /api/afiliaciones/list - Lista de contactos para gestión y contacto territorial (con PIN opcional)
+// 5. GET /api/afiliaciones/list - Lista de contactos protegida por PIN
 app.get('/api/afiliaciones/list', async (req, res) => {
   try {
-    const pin = req.headers['x-admin-pin'] || req.query.pin;
-    const requiredPin = process.env.ADMIN_PIN || 'somos2026';
-
-    if (pin && pin !== requiredPin) {
-      return res.status(401).json({ error: 'PIN de administración inválido' });
+    if (!verifyAdminPin(req)) {
+      return res.status(401).json({ error: 'Acceso no autorizado. Se requiere PIN de administración.' });
     }
 
     if (pgPool) {
@@ -492,14 +588,22 @@ async function triggerDailyReport(forceSend = false): Promise<{ success: boolean
   }
 }
 
-// 7. POST /api/afiliaciones/enviar-resumen-diario - Forzar o probar envío del resumen diario
+// 7. POST /api/afiliaciones/enviar-resumen-diario - Forzar o probar envío del resumen diario (Protegido por PIN)
 app.post('/api/afiliaciones/enviar-resumen-diario', async (req, res) => {
+  if (!verifyAdminPin(req)) {
+    return res.status(401).json({ error: 'Acceso no autorizado. Se requiere PIN de administración.' });
+  }
+
   const result = await triggerDailyReport(true);
   return res.json(result);
 });
 
-// 8. GET /api/afiliaciones/smtp-status - Estado de configuración del correo
+// 8. GET /api/afiliaciones/smtp-status - Estado de configuración del correo (Protegido por PIN)
 app.get('/api/afiliaciones/smtp-status', (req, res) => {
+  if (!verifyAdminPin(req)) {
+    return res.status(401).json({ error: 'Acceso no autorizado. Se requiere PIN de administración.' });
+  }
+
   return res.json({
     configured: isSmtpConfigured(),
     recipient: process.env.NOTIFICATION_EMAIL || 'partidosomosjujuy@gmail.com',

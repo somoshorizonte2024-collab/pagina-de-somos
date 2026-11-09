@@ -3,7 +3,6 @@ import { TopBar } from './components/ui/TopBar';
 import { CinematicCanvas } from './components/scene/CinematicCanvas';
 import { CarnetModal } from './components/carnet/CarnetModal';
 import { CredencialVerificationModal } from './components/carnet/CredencialVerificationModal';
-import { AdminModal } from './components/admin/AdminModal';
 import { soundscape } from './audio/soundscape';
 import { CAMPAIGN_COPY } from './data/campaignCopy';
 import {
@@ -11,6 +10,8 @@ import {
   VolumeX,
   ArrowRight,
   IdCard,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 import imgYungas from './assets/images/jujuy_yungas_mist_1793819887266.jpg';
@@ -33,10 +34,10 @@ const SLIDES = CAMPAIGN_COPY.slides.map((slide, idx) => ({
 export default function App() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isCarnetOpen, setIsCarnetOpen] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [verificarAfiliadoId, setVerificarAfiliadoId] = useState<string | null>(null);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   // Detectar si alguien escaneó un código QR con ?validar=SOMOS-JUJ-XXXX o /validar/SOMOS-JUJ-XXXX
   useEffect(() => {
@@ -69,6 +70,32 @@ export default function App() {
     soundscape.setLandscapeByIndex(currentSlide);
   }, [currentSlide]);
 
+  // Rotación automática suave de escenarios cada 7.5 segundos (se pausa si hay un modal abierto)
+  useEffect(() => {
+    if (isCarnetOpen || verificarAfiliadoId) return;
+
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
+    }, 7500);
+
+    return () => clearInterval(timer);
+  }, [isCarnetOpen, verificarAfiliadoId, currentSlide]);
+
+  const nextSlide = () => {
+    soundscape.playClick();
+    setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
+  };
+
+  const prevSlide = () => {
+    soundscape.playClick();
+    setCurrentSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
+  };
+
+  const goToSlide = (idx: number) => {
+    soundscape.playRegionTransition(idx);
+    setCurrentSlide(idx);
+  };
+
   // Atajos de teclado para navegación fluida
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -77,17 +104,13 @@ export default function App() {
       }
 
       if (e.key === 'ArrowRight' || e.key === ' ') {
-        soundscape.playClick();
-        setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
+        nextSlide();
       } else if (e.key === 'ArrowLeft') {
-        soundscape.playClick();
-        setCurrentSlide((prev) => (prev - 1 + SLIDES.length) % SLIDES.length);
+        prevSlide();
       } else if (['1', '2', '3', '4'].includes(e.key)) {
-        soundscape.playRegionTransition(Number(e.key) - 1);
-        setCurrentSlide(Number(e.key) - 1);
+        goToSlide(Number(e.key) - 1);
       } else if (e.key === 'Escape') {
         setIsCarnetOpen(false);
-        setIsAdminOpen(false);
         setVerificarAfiliadoId(null);
       }
     };
@@ -105,21 +128,61 @@ export default function App() {
     }
   };
 
+  // Gestos táctiles en teléfonos móviles (deslizar izquierda o derecha)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+
+    if (diff > 50) {
+      nextSlide();
+    } else if (diff < -50) {
+      prevSlide();
+    }
+    setTouchStartX(null);
+  };
+
   const activeSlide = SLIDES[currentSlide];
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#0C2340] text-slate-100 select-none font-sans">
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="relative w-screen h-screen overflow-hidden bg-[#0C2340] text-slate-100 select-none font-sans"
+    >
       {/* 1. Barra de Navegación Superior Limpia con Redes Oficiales */}
       <TopBar
         onOpenCarnet={() => setIsCarnetOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       {/* 2. Lienzo WebGL Cinemático con Distorsión Líquida y Partículas */}
       <CinematicCanvas currentSlideIndex={currentSlide} slides={SLIDES} />
 
-      {/* 3. Contenido Editorial Inmersivo en Pantalla Completa */}
-      <div className="relative z-20 w-full h-full flex flex-col justify-between pt-24 pb-10 px-6 sm:px-12 md:px-20 pointer-events-none">
+      {/* 3. Flechas de Navegación Flotantes (Izquierda y Derecha) */}
+      <button
+        onClick={prevSlide}
+        className="fixed left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2 sm:p-2.5 rounded-full bg-black/40 hover:bg-[#EE007C] border border-white/20 hover:border-[#EE007C] text-white/80 hover:text-white backdrop-blur-md transition-all shadow-xl active:scale-90 cursor-pointer pointer-events-auto"
+        aria-label="Escenario anterior"
+        title="Escenario anterior (←)"
+      >
+        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+      </button>
+
+      <button
+        onClick={nextSlide}
+        className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2 sm:p-2.5 rounded-full bg-black/40 hover:bg-[#00AEEF] border border-white/20 hover:border-[#00AEEF] text-white/80 hover:text-white backdrop-blur-md transition-all shadow-xl active:scale-90 cursor-pointer pointer-events-auto"
+        aria-label="Escenario siguiente"
+        title="Escenario siguiente (→)"
+      >
+        <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+      </button>
+
+      {/* 4. Contenido Editorial Inmersivo en Pantalla Completa */}
+      <div className="relative z-20 w-full h-full flex flex-col justify-between pt-24 pb-8 sm:pb-10 px-6 sm:px-12 md:px-20 pointer-events-none">
         {/* Encabezado del Slide Actual */}
         <div className="flex items-center justify-between text-xs font-mono uppercase tracking-[0.25em] text-white/70">
           <div className="flex items-center gap-2">
@@ -196,13 +259,41 @@ export default function App() {
           </div>
         </div>
 
+        {/* 5. Selector de Regiones Inferior (4 Ejes Territoriales Interactivos) */}
+        <div className="w-full flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t border-white/10 pointer-events-auto">
+          <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1">
+            {SLIDES.map((slide, idx) => {
+              const isActive = idx === currentSlide;
+              return (
+                <button
+                  key={slide.id}
+                  onClick={() => goToSlide(idx)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                    isActive
+                      ? 'bg-white/20 border border-[#00AEEF] text-white shadow-lg'
+                      : 'bg-black/40 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isActive ? 'bg-[#EE007C] animate-pulse' : 'bg-white/30'
+                    }`}
+                  />
+                  <span className="font-bold">{slide.tag}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-slate-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span>Rotación activa (7.5s)</span>
+          </div>
+        </div>
       </div>
 
-      {/* 5. Modal de Carnet Oficial de Afiliación (Padrón Permanente con Números Únicos) */}
+      {/* 6. Modal de Carnet Oficial de Afiliación (Padrón Permanente con Números Únicos) */}
       <CarnetModal isOpen={isCarnetOpen} onClose={() => setIsCarnetOpen(false)} />
-
-      {/* 6. Panel de Gestión y Contactos Territorial (Administración SOMOS Jujuy) */}
-      <AdminModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} />
 
       {/* 7. Modal de Verificación Pública de Credencial por Código QR */}
       <CredencialVerificationModal
@@ -216,3 +307,4 @@ export default function App() {
     </div>
   );
 }
+

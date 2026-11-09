@@ -11,6 +11,15 @@ export interface AfiliadoReportItem {
   fechaRegistro: string;
 }
 
+function escapeHtml(str: string): string {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function isSmtpConfigured(): boolean {
   return Boolean(process.env.SMTP_USER && process.env.SMTP_PASS);
 }
@@ -44,24 +53,34 @@ export async function sendDailySummaryEmail(
 
   const rowsHtml = afiliadosHoy
     .map(
-      (a, idx) => `
+      (a, idx) => {
+        const safeNumero = escapeHtml(a.numeroAfiliado);
+        const safeNombre = escapeHtml(a.nombre);
+        const safeEmail = escapeHtml(a.email);
+        const safeMunicipio = escapeHtml(a.municipio);
+        const safeArea = escapeHtml(a.areaAccion || 'General');
+        const cleanTelDigits = (a.telefono || '').replace(/\D/g, '');
+        const safeTel = escapeHtml(a.telefono);
+
+        return `
       <tr style="border-bottom: 1px solid #e2e8f0; background: ${idx % 2 === 0 ? '#f8fafc' : '#ffffff'};">
-        <td style="padding: 10px; font-weight: bold; font-family: monospace; color: #EE007C;">${a.numeroAfiliado}</td>
-        <td style="padding: 10px; font-weight: bold; color: #0C2340;">${a.nombre}</td>
+        <td style="padding: 10px; font-weight: bold; font-family: monospace; color: #EE007C;">${safeNumero}</td>
+        <td style="padding: 10px; font-weight: bold; color: #0C2340;">${safeNombre}</td>
         <td style="padding: 10px; color: #0284c7; font-weight: 600;">
-          <a href="mailto:${a.email}" style="color: #0284c7; text-decoration: none;">${a.email || '(Sin email)'}</a>
+          <a href="mailto:${safeEmail}" style="color: #0284c7; text-decoration: none;">${safeEmail || '(Sin email)'}</a>
         </td>
         <td style="padding: 10px; color: #16a34a; font-family: monospace;">
           ${
-            a.telefono
-              ? `<a href="https://wa.me/${a.telefono.replace(/\D/g, '')}" style="color: #16a34a; text-decoration: none;">${a.telefono}</a>`
+            cleanTelDigits
+              ? `<a href="https://wa.me/${cleanTelDigits}" style="color: #16a34a; text-decoration: none;">${safeTel}</a>`
               : '<span style="color: #94a3b8; font-style: italic;">Sin teléfono</span>'
           }
         </td>
-        <td style="padding: 10px; color: #334155;">${a.municipio}</td>
-        <td style="padding: 10px; color: #64748b; font-size: 12px;">${a.areaAccion || 'General'}</td>
+        <td style="padding: 10px; color: #334155;">${safeMunicipio}</td>
+        <td style="padding: 10px; color: #64748b; font-size: 12px;">${safeArea}</td>
       </tr>
-    `
+    `;
+      }
     )
     .join('');
 
