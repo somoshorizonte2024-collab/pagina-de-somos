@@ -117,12 +117,14 @@ async function initDatabase() {
           nombre VARCHAR(255) NOT NULL,
           municipio VARCHAR(255) NOT NULL,
           area_accion VARCHAR(255) DEFAULT 'Solo Adhesión / Participación General',
+          propuesta TEXT DEFAULT '',
           telefono VARCHAR(100) DEFAULT '',
           email VARCHAR(255) DEFAULT '',
           fecha_registro TIMESTAMPTZ DEFAULT NOW()
         );
 
         ALTER TABLE afiliados ADD COLUMN IF NOT EXISTS email VARCHAR(255) DEFAULT '';
+        ALTER TABLE afiliados ADD COLUMN IF NOT EXISTS propuesta TEXT DEFAULT '';
       `);
       console.log('[PostgreSQL] Conexión establecida. Esquema y secuencia numérica inicializados con éxito');
       return;
@@ -193,7 +195,7 @@ app.post('/api/afiliaciones', async (req, res) => {
       return res.status(429).json({ error: 'Demasiadas solicitudes de registro desde esta conexión. Por favor espere unos minutos.' });
     }
 
-    const { nombre, municipio, areaAccion, telefono, email } = req.body;
+    const { nombre, municipio, areaAccion, telefono, email, propuesta } = req.body;
 
     if (!nombre || !municipio || !email) {
       return res.status(400).json({ error: 'Nombre, municipio y correo electrónico son requeridos' });
@@ -201,7 +203,8 @@ app.post('/api/afiliaciones', async (req, res) => {
 
     const cleanNombre = String(nombre).trim();
     const cleanMunicipio = String(municipio).trim();
-    const cleanArea = String(areaAccion || 'Solo Adhesión Ciudadana (General)').trim();
+    const cleanPropuesta = String(propuesta || '').trim().slice(0, 2500);
+    const cleanArea = String(areaAccion || (cleanPropuesta ? 'Buzón de Propuestas' : 'Solo Adhesión Ciudadana (General)')).trim();
     const cleanTel = String(telefono || '').trim();
     const cleanEmail = String(email || '').trim().toLowerCase();
 
@@ -238,17 +241,17 @@ app.post('/api/afiliaciones', async (req, res) => {
         const numeroAfiliado = `SOMOS-JUJ-${formattedNum}`;
 
         const insertRes = await pgPool.query(
-          `INSERT INTO afiliados (id, numero_afiliado, nombre, municipio, area_accion, telefono, email, fecha_registro)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-           RETURNING id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", telefono, email, fecha_registro as "fechaRegistro"`,
-          [numeroAfiliado, numeroAfiliado, cleanNombre, cleanMunicipio, cleanArea, cleanTel, cleanEmail]
+          `INSERT INTO afiliados (id, numero_afiliado, nombre, municipio, area_accion, propuesta, telefono, email, fecha_registro)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+           RETURNING id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", propuesta, telefono, email, fecha_registro as "fechaRegistro"`,
+          [numeroAfiliado, numeroAfiliado, cleanNombre, cleanMunicipio, cleanArea, cleanPropuesta, cleanTel, cleanEmail]
         );
 
         const countRes = await pgPool.query('SELECT count(*) as total FROM afiliados');
         const totalAfiliados = parseInt(countRes.rows[0].total, 10);
 
         const nuevoAfiliado = insertRes.rows[0];
-        console.log(`[Afiliación PostgreSQL] ${numeroAfiliado} - ${cleanNombre} (${cleanMunicipio}) - Email: ${cleanEmail}`);
+        console.log(`[Afiliación PostgreSQL] ${numeroAfiliado} - ${cleanNombre} (${cleanMunicipio}) - Propuesta: ${cleanPropuesta ? 'Sí' : 'No'}`);
 
         return res.status(201).json({
           success: true,
@@ -275,6 +278,7 @@ app.post('/api/afiliaciones', async (req, res) => {
       nombre: cleanNombre,
       municipio: cleanMunicipio,
       areaAccion: cleanArea,
+      propuesta: cleanPropuesta,
       telefono: cleanTel,
       email: cleanEmail,
       fechaRegistro: new Date().toISOString(),
@@ -286,7 +290,7 @@ app.post('/api/afiliaciones', async (req, res) => {
     db.afiliados.push(nuevoAfiliado);
     writeJsonDatabase(db);
 
-    console.log(`[Afiliación JSON] ${numeroAfiliado} - ${nuevoAfiliado.nombre} (${nuevoAfiliado.municipio}) - Email: ${cleanEmail}`);
+    console.log(`[Afiliación JSON] ${numeroAfiliado} - ${nuevoAfiliado.nombre} (${nuevoAfiliado.municipio}) - Propuesta: ${cleanPropuesta ? 'Sí' : 'No'}`);
 
     return res.status(201).json({
       success: true,
@@ -440,7 +444,7 @@ async function getAllAfiliadosForReport(): Promise<AfiliadoReportItem[]> {
   if (pgPool) {
     try {
       const res = await pgPool.query(
-        'SELECT id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", telefono, email, fecha_registro as "fechaRegistro" FROM afiliados ORDER BY fecha_registro ASC'
+        'SELECT id, numero_afiliado as "numeroAfiliado", nombre, municipio, area_accion as "areaAccion", propuesta, telefono, email, fecha_registro as "fechaRegistro" FROM afiliados ORDER BY fecha_registro ASC'
       );
       return res.rows;
     } catch (err) {

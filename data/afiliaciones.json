@@ -1,5 +1,5 @@
 {
-  "lastNumber": 100,
+  "lastNumber": 102,
   "afiliados": [
     {
       "id": "SOMOS-JUJ-0100",
@@ -10,6 +10,27 @@
       "telefono": "",
       "email": "contacto@somosjujuy.org",
       "fechaRegistro": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "SOMOS-JUJ-0101",
+      "numeroAfiliado": "SOMOS-JUJ-0101",
+      "nombre": "Valeria Gutierrez",
+      "municipio": "Humahuaca",
+      "areaAccion": "Solo Adhesión Ciudadana (General)",
+      "telefono": "3884567890",
+      "email": "valeria.test@gmail.com",
+      "fechaRegistro": "2026-11-10T12:26:53.308Z"
+    },
+    {
+      "id": "SOMOS-JUJ-0102",
+      "numeroAfiliado": "SOMOS-JUJ-0102",
+      "nombre": "Valeria Gutierrez",
+      "municipio": "Humahuaca",
+      "areaAccion": "Buzón de Propuestas",
+      "propuesta": "Crear talleres de oficios y conectividad comunitaria para jóvenes en Humahuaca",
+      "telefono": "3884567890",
+      "email": "valeria.test2@gmail.com",
+      "fechaRegistro": "2026-11-10T12:27:04.040Z"
     }
   ]
 }

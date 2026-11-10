@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
 import {
   X,
-  Download,
   Share2,
   MessageCircle,
   CheckCircle,
   Sparkles,
-  UserCheck,
   Shield,
   Loader2,
+  Mail,
+  Lightbulb,
+  Phone,
+  MapPin,
+  User,
+  Heart,
 } from 'lucide-react';
 import { soundscape } from '../../audio/soundscape';
 import { CAMPAIGN_COPY } from '../../data/campaignCopy';
 import { SomosLogo } from '../ui/SomosLogo';
-import logoImg from '../../assets/images/somos_logo_oficial.png';
 
 interface CarnetModalProps {
   isOpen: boolean;
@@ -29,23 +31,24 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
 }) => {
   const [nombre, setNombre] = useState('');
   const [municipio, setMunicipio] = useState(defaultMunicipio);
-  const [areaAccion, setAreaAccion] = useState(CAMPAIGN_COPY.actionAreas[0].id);
   const [telefono, setTelefono] = useState('');
   const [email, setEmail] = useState('');
+  const [propuesta, setPropuesta] = useState('');
   const [afiliadoId, setAfiliadoId] = useState('SOMOS-JUJ-0101');
-  const [fechaRegistro, setFechaRegistro] = useState('');
-  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [submittedPropuesta, setSubmittedPropuesta] = useState('');
+  const [submittedNombre, setSubmittedNombre] = useState('');
+  const [submittedEmail, setSubmittedEmail] = useState('');
+  const [submittedTelefono, setSubmittedTelefono] = useState('');
   const [isCopied, setIsCopied] = useState(false);
-  const [isGenerated, setIsGenerated] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetch('/api/afiliaciones/stats')
         .then((res) => res.json())
         .then((data) => {
-          if (data.ultimoNumero && !isGenerated) {
+          if (data.ultimoNumero && !isSubmitted) {
             const parts = data.ultimoNumero.split('-');
             const nextNum = Number(parts[2] || 100) + 1;
             setAfiliadoId(`SOMOS-JUJ-${String(nextNum).padStart(4, '0')}`);
@@ -55,27 +58,7 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
           setAfiliadoId('SOMOS-JUJ-0101');
         });
     }
-  }, [isOpen, isGenerated]);
-
-  const currentAreaObj =
-    CAMPAIGN_COPY.actionAreas.find((a) => a.id === areaAccion) || CAMPAIGN_COPY.actionAreas[0];
-
-  useEffect(() => {
-    if (!afiliadoId) return;
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://somosjujuy.org';
-    const payload = `${baseUrl}/?validar=${encodeURIComponent(afiliadoId)}`;
-
-    QRCode.toDataURL(payload, {
-      width: 180,
-      margin: 1,
-      color: {
-        dark: '#0C2340',
-        light: '#FFFFFF',
-      },
-    })
-      .then((url) => setQrDataUrl(url))
-      .catch((err) => console.error('Error QR', err));
-  }, [afiliadoId, nombre, municipio, areaAccion]);
+  }, [isOpen, isSubmitted]);
 
   if (!isOpen) return null;
 
@@ -86,16 +69,22 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
     setIsSubmitting(true);
     soundscape.playClick();
 
+    const currentPropuesta = propuesta.trim();
+    const currentNombre = nombre.trim();
+    const currentEmail = email.trim();
+    const currentTelefono = telefono.trim();
+
     try {
       const response = await fetch('/api/afiliaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre: nombre.trim(),
+          nombre: currentNombre,
           municipio,
-          areaAccion: currentAreaObj.label,
-          telefono: telefono.trim(),
-          email: email.trim(),
+          areaAccion: currentPropuesta ? 'Buzón de Propuestas' : 'Adhesión General',
+          propuesta: currentPropuesta,
+          telefono: currentTelefono,
+          email: currentEmail,
         }),
       });
 
@@ -103,38 +92,34 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
 
       if (response.ok && data.afiliado) {
         setAfiliadoId(data.afiliado.numeroAfiliado);
-        setFechaRegistro(new Date(data.afiliado.fechaRegistro).toLocaleDateString('es-AR'));
-        setIsGenerated(true);
-        soundscape.playCarnetIssued();
-      } else {
-        setIsGenerated(true);
-        soundscape.playCarnetIssued();
       }
+      setSubmittedNombre(currentNombre);
+      setSubmittedEmail(currentEmail);
+      setSubmittedTelefono(currentTelefono);
+      setSubmittedPropuesta(currentPropuesta);
+      setIsSubmitted(true);
+      soundscape.playCarnetIssued();
     } catch {
-      setIsGenerated(true);
+      setSubmittedNombre(currentNombre);
+      setSubmittedEmail(currentEmail);
+      setSubmittedTelefono(currentTelefono);
+      setSubmittedPropuesta(currentPropuesta);
+      setIsSubmitted(true);
       soundscape.playCarnetIssued();
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleWhatsAppJoin = () => {
+  const handleWhatsAppShare = () => {
     soundscape.playClick();
-    const msg = CAMPAIGN_COPY.carnetModal.actions.whatsappMessageTemplate(
-      municipio,
-      afiliadoId,
-      nombre,
-      currentAreaObj.label
-    );
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    const shareText = CAMPAIGN_COPY.carnetModal.success.whatsappShareText(window.location.origin);
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
   };
 
   const handleShareLink = () => {
     soundscape.playClick();
-    const shareText = CAMPAIGN_COPY.carnetModal.actions.shareMessageText(
-      afiliadoId,
-      window.location.origin
-    );
+    const shareText = CAMPAIGN_COPY.carnetModal.success.whatsappShareText(window.location.origin);
     if (navigator.clipboard) {
       navigator.clipboard.writeText(shareText);
       setIsCopied(true);
@@ -142,151 +127,21 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
     }
   };
 
-  const handleDownloadCarnet = async () => {
-    setIsDownloading(true);
+  const handleResetAndClose = () => {
     soundscape.playClick();
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 760;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-      setIsDownloading(false);
-      return;
-    }
-
-    // Fondo Azul Profundo SOMOS (#0C2340)
-    ctx.fillStyle = '#0C2340';
-    ctx.fillRect(0, 0, 1200, 760);
-
-    // Patrón geométrico
-    ctx.strokeStyle = 'rgba(0, 174, 239, 0.2)';
-    ctx.lineWidth = 2;
-    for (let x = -200; x < 1400; x += 80) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x + 300, 760);
-      ctx.stroke();
-    }
-
-    // Franjas de marca
-    ctx.fillStyle = '#EE007C';
-    ctx.fillRect(60, 40, 1080, 12);
-    ctx.fillStyle = '#00AEEF';
-    ctx.fillRect(60, 56, 1080, 8);
-
-    // Borde
-    ctx.strokeStyle = '#00AEEF';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(60, 40, 1080, 680);
-
-    // Encabezado con Logotipo Oficial SOMOS
-    const logo = new Image();
-    logo.src = logoImg;
-    await new Promise((resolve) => {
-      if (logo.complete) resolve(null);
-      else {
-        logo.onload = () => resolve(null);
-        logo.onerror = () => resolve(null);
-      }
-    });
-
-    if (logo.width) {
-      // Dimensiones proporcionales del isotipo oficial
-      ctx.drawImage(logo, 100, 95, 330, 68);
-    } else {
-      ctx.fillStyle = '#EE007C';
-      ctx.font = '900 64px Montserrat, sans-serif';
-      ctx.fillText('SOMOS', 100, 150);
-    }
-
-    // Título de la Credencial
-    ctx.fillStyle = '#F8C300';
-    ctx.font = 'bold 26px Inter, sans-serif';
-    ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.statusBadge.toUpperCase(), 620, 140);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = '18px Inter, sans-serif';
-    ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.movementFooter, 620, 170);
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.beginPath();
-    ctx.moveTo(100, 220);
-    ctx.lineTo(1100, 220);
-    ctx.stroke();
-
-    // Datos del Titular
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.font = '16px Inter, sans-serif';
-    ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.titularLabel, 100, 270);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 38px Montserrat, sans-serif';
-    ctx.fillText(
-      (nombre || CAMPAIGN_COPY.carnetModal.cardDesign.defaultTitular).toUpperCase(),
-      100,
-      320
-    );
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.font = '16px Inter, sans-serif';
-    ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.territorioLabel, 100, 390);
-
-    ctx.fillStyle = '#00AEEF';
-    ctx.font = 'bold 30px Inter, sans-serif';
-    ctx.fillText(municipio.toUpperCase(), 100, 435);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.font = '16px Inter, sans-serif';
-    ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.accionLabel, 100, 500);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 24px Inter, sans-serif';
-    ctx.fillText(currentAreaObj.label, 100, 540);
-
-    // Número oficial de padrón
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.font = '16px Inter, sans-serif';
-    ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.numeroPadronLabel, 100, 610);
-
-    ctx.fillStyle = '#EE007C';
-    ctx.font = 'bold 30px monospace';
-    ctx.fillText(afiliadoId, 100, 650);
-
-    if (qrDataUrl) {
-      const qrImg = new Image();
-      qrImg.crossOrigin = 'anonymous';
-      qrImg.onload = () => {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(820, 280, 240, 240);
-        ctx.drawImage(qrImg, 830, 290, 220, 220);
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = '14px Inter, sans-serif';
-        ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.qrVerificationLabel, 840, 555);
-
-        ctx.fillStyle = '#00AEEF';
-        ctx.font = 'bold 16px Inter, sans-serif';
-        ctx.fillText(CAMPAIGN_COPY.carnetModal.cardDesign.partySubFooter, 860, 580);
-
-        const downloadLink = document.createElement('a');
-        downloadLink.download = `Carnet_SOMOS_${afiliadoId}_${nombre.replace(/\s+/g, '_') || 'Afiliado'}.png`;
-        downloadLink.href = canvas.toDataURL('image/png');
-        downloadLink.click();
-        setIsDownloading(false);
-      };
-      qrImg.src = qrDataUrl;
-    } else {
-      setIsDownloading(false);
-    }
+    setIsSubmitted(false);
+    setNombre('');
+    setTelefono('');
+    setEmail('');
+    setPropuesta('');
+    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-[#0C2340] border border-[#00AEEF]/50 rounded-2xl shadow-2xl overflow-hidden my-6">
+      <div className="relative w-full max-w-xl bg-[#0C2340] border border-[#00AEEF]/40 rounded-2xl shadow-2xl overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-200">
         {/* Cabecera del Modal */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0C2340]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0C2340]/90">
           <div className="flex items-center gap-3">
             <SomosLogo size="sm" showSubtitle={false} />
             <div className="h-6 w-px bg-white/15" />
@@ -295,15 +150,12 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
                 {CAMPAIGN_COPY.carnetModal.title}
               </h2>
               <p className="text-[11px] text-slate-400">
-                {CAMPAIGN_COPY.carnetModal.description}
+                Ficha de adhesión y buzón ciudadano
               </p>
             </div>
           </div>
           <button
-            onClick={() => {
-              soundscape.playClick();
-              onClose();
-            }}
+            onClick={handleResetAndClose}
             className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
             aria-label="Cerrar modal"
           >
@@ -311,230 +163,231 @@ export const CarnetModal: React.FC<CarnetModalProps> = ({
           </button>
         </div>
 
-        {/* Formulario y Carnet */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
-          <div className="lg:col-span-5 flex flex-col justify-between">
-            <form onSubmit={handleSubmitForm} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  {CAMPAIGN_COPY.carnetModal.form.nombreLabel}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  placeholder={CAMPAIGN_COPY.carnetModal.form.nombrePlaceholder}
-                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] text-sm"
-                />
-              </div>
+        {/* Contenido: Formulario o Pantalla de Confirmación */}
+        <div className="p-6">
+          {!isSubmitted ? (
+            <div>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-5">
+                {CAMPAIGN_COPY.carnetModal.description}
+              </p>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  {CAMPAIGN_COPY.carnetModal.form.municipioLabel}
-                </label>
-                <select
-                  value={municipio}
-                  onChange={(e) => setMunicipio(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-[#00AEEF] text-sm"
-                >
-                  {CAMPAIGN_COPY.municipalities.map((m) => (
-                    <option key={m} value={m} className="bg-slate-900 text-white">
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  {CAMPAIGN_COPY.carnetModal.form.telefonoLabel}
-                </label>
-                <input
-                  type="tel"
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  placeholder={CAMPAIGN_COPY.carnetModal.form.telefonoPlaceholder}
-                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                  {CAMPAIGN_COPY.carnetModal.form.emailLabel}
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={CAMPAIGN_COPY.carnetModal.form.emailPlaceholder}
-                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                  <span>{CAMPAIGN_COPY.carnetModal.form.areaLabel}</span>
-                </label>
-                <select
-                  value={areaAccion}
-                  onChange={(e) => setAreaAccion(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-[#00AEEF] text-sm"
-                >
-                  {CAMPAIGN_COPY.actionAreas.map((a) => (
-                    <option key={a.id} value={a.id} className="bg-slate-900 text-white">
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full py-3 px-4 bg-[#EE007C] hover:bg-[#d4006e] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{CAMPAIGN_COPY.carnetModal.form.submittingButton}</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>{CAMPAIGN_COPY.carnetModal.form.submitButton}</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="mt-4 p-3 bg-slate-900/50 border border-white/5 rounded-xl text-[11px] text-slate-400 flex items-start gap-2">
-              <Shield className="w-4 h-4 text-[#00AEEF] shrink-0 mt-0.5" />
-              <span>{CAMPAIGN_COPY.carnetModal.form.disclaimer}</span>
-            </div>
-          </div>
-
-          {/* Previsualización del Carnet Oficial */}
-          <div className="lg:col-span-7 flex flex-col items-center justify-center">
-            <div className="w-full max-w-md bg-gradient-to-br from-[#0C2340] via-[#091b33] to-[#040f1c] border-2 border-[#00AEEF] rounded-2xl p-5 shadow-2xl relative overflow-hidden group">
-              <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#EE007C]" />
-              <div className="absolute top-1.5 left-0 right-0 h-1 bg-[#00AEEF]" />
-
-              <div className="flex items-start justify-between">
+              <form onSubmit={handleSubmitForm} className="space-y-4">
+                {/* Nombre y Apellido */}
                 <div>
-                  <SomosLogo size="xs" />
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-[#00AEEF]" />
+                    <span>{CAMPAIGN_COPY.carnetModal.form.nombreLabel}</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
+                    placeholder={CAMPAIGN_COPY.carnetModal.form.nombrePlaceholder}
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] text-sm transition-all"
+                  />
                 </div>
-                <div className="text-right">
-                  <span className="inline-block px-2 py-0.5 bg-[#F8C300]/10 border border-[#F8C300]/40 rounded text-[10px] font-bold text-[#F8C300] uppercase">
-                    {CAMPAIGN_COPY.carnetModal.cardDesign.statusBadge}
-                  </span>
-                  <p className="text-xs text-white font-mono font-bold mt-1 tracking-wider">
-                    {afiliadoId}
+
+                {/* Municipio */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#00AEEF]" />
+                    <span>{CAMPAIGN_COPY.carnetModal.form.municipioLabel}</span>
+                  </label>
+                  <select
+                    value={municipio}
+                    onChange={(e) => setMunicipio(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] text-sm transition-all cursor-pointer"
+                  >
+                    {CAMPAIGN_COPY.municipalities.map((m) => (
+                      <option key={m} value={m} className="bg-slate-900 text-white">
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Correo Electrónico (Obligatorio) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-[#EE007C]" />
+                    <span>{CAMPAIGN_COPY.carnetModal.form.emailLabel}</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={CAMPAIGN_COPY.carnetModal.form.emailPlaceholder}
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] text-sm transition-all"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Te escribiremos a este email para coordinar la firma en papel de tu ficha de afiliación.
                   </p>
                 </div>
-              </div>
 
-              <div className="mt-5 grid grid-cols-12 gap-3 items-center">
-                <div className="col-span-8 space-y-2">
-                  <div>
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">
-                      {CAMPAIGN_COPY.carnetModal.cardDesign.titularLabel}
-                    </p>
-                    <p className="text-base font-bold text-white font-montserrat truncate">
-                      {(nombre.trim() || CAMPAIGN_COPY.carnetModal.cardDesign.defaultTitular).toUpperCase()}
-                    </p>
-                  </div>
+                {/* WhatsApp / Teléfono (Opcional) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-[#25D366]" />
+                    <span>{CAMPAIGN_COPY.carnetModal.form.telefonoLabel}</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                    placeholder={CAMPAIGN_COPY.carnetModal.form.telefonoPlaceholder}
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] text-sm transition-all"
+                  />
+                </div>
 
-                  <div>
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">
-                      {CAMPAIGN_COPY.carnetModal.cardDesign.territorioLabel}
-                    </p>
-                    <p className="text-xs font-semibold text-[#00AEEF]">{municipio}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] uppercase font-semibold text-slate-400">
-                      {CAMPAIGN_COPY.carnetModal.cardDesign.accionLabel}
-                    </p>
-                    <p className="text-[11px] text-slate-200 line-clamp-1">{currentAreaObj.label}</p>
+                {/* Buzón de Propuestas (Reemplaza a "¿Te gustaría militar?") */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Lightbulb className="w-3.5 h-3.5 text-[#F8C300]" />
+                      <span>{CAMPAIGN_COPY.carnetModal.form.propuestaLabel}</span>
+                    </span>
+                    <span className="text-[10px] text-[#F8C300] font-normal lowercase bg-[#F8C300]/10 px-2 py-0.5 rounded border border-[#F8C300]/20">
+                      Tu voz importa
+                    </span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={propuesta}
+                    onChange={(e) => setPropuesta(e.target.value)}
+                    placeholder={CAMPAIGN_COPY.carnetModal.form.propuestaPlaceholder}
+                    maxLength={1500}
+                    className="w-full px-3.5 py-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-[#00AEEF] focus:ring-1 focus:ring-[#00AEEF] text-sm resize-none transition-all leading-relaxed"
+                  />
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+                    <span>Proyectos vecinales, inquietudes, salud, trabajo joven, educación o ambiente</span>
+                    <span>{propuesta.length}/1500</span>
                   </div>
                 </div>
 
-                <div className="col-span-4 flex flex-col items-center justify-center">
-                  <div className="p-1.5 bg-white rounded-lg shadow-md">
-                    {qrDataUrl ? (
-                      <img
-                        src={qrDataUrl}
-                        alt="Código QR de verificación"
-                        className="w-20 h-20 object-contain"
-                      />
-                    ) : (
-                      <div className="w-20 h-20 bg-slate-200 animate-pulse" />
-                    )}
-                  </div>
-                  <span className="text-[9px] text-slate-400 mt-1">Escaneable</span>
-                </div>
-              </div>
-
-              <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
-                <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" />
-                  {CAMPAIGN_COPY.carnetModal.cardDesign.movementFooter}
-                </span>
-                <span className="text-white/60 font-mono">
-                  {fechaRegistro || new Date().toLocaleDateString('es-AR')}
-                </span>
-              </div>
-            </div>
-
-            <div className="w-full max-w-md mt-4 space-y-2">
-              <button
-                type="button"
-                onClick={handleWhatsAppJoin}
-                className="w-full py-2.5 px-4 bg-[#25D366] hover:bg-[#20b858] text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
-              >
-                <MessageCircle className="w-4 h-4 fill-slate-950" />
-                <span>{CAMPAIGN_COPY.carnetModal.actions.whatsappButtonText(afiliadoId)}</span>
-              </button>
-
-              <div className="grid grid-cols-2 gap-2">
+                {/* Botón de Envío */}
                 <button
-                  type="button"
-                  disabled={isDownloading}
-                  onClick={handleDownloadCarnet}
-                  className="py-2 px-3 bg-white/10 hover:bg-white/15 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3.5 px-4 bg-gradient-to-r from-[#EE007C] to-[#d4006e] hover:from-[#d4006e] hover:to-[#b0005a] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 mt-2"
                 >
-                  <Download className="w-3.5 h-3.5 text-[#00AEEF]" />
-                  <span>
-                    {isDownloading
-                      ? CAMPAIGN_COPY.carnetModal.actions.downloadingButton
-                      : CAMPAIGN_COPY.carnetModal.actions.downloadButton}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleShareLink}
-                  className="py-2 px-3 bg-white/10 hover:bg-white/15 text-white font-medium rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  {isCopied ? (
+                  {isSubmitting ? (
                     <>
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">
-                        {CAMPAIGN_COPY.carnetModal.actions.copiedButton}
-                      </span>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{CAMPAIGN_COPY.carnetModal.form.submittingButton}</span>
                     </>
                   ) : (
                     <>
-                      <Share2 className="w-3.5 h-3.5 text-[#F8C300]" />
-                      <span>{CAMPAIGN_COPY.carnetModal.actions.shareButton}</span>
+                      <Sparkles className="w-4 h-4" />
+                      <span>{CAMPAIGN_COPY.carnetModal.form.submitButton}</span>
                     </>
                   )}
                 </button>
+              </form>
+
+              {/* Aviso de Privacidad y Afiliación Oficial */}
+              <div className="mt-4 p-3 bg-slate-900/60 border border-white/5 rounded-xl text-[11px] text-slate-400 flex items-start gap-2.5">
+                <Shield className="w-4 h-4 text-[#00AEEF] shrink-0 mt-0.5" />
+                <span>{CAMPAIGN_COPY.carnetModal.form.disclaimer}</span>
               </div>
             </div>
-          </div>
+          ) : (
+            /* Estado de Confirmación Exitosa */
+            <div className="text-center py-2 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/15 border-2 border-emerald-500/50 text-emerald-400 mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                <CheckCircle className="w-8 h-8 text-emerald-400" />
+              </div>
+
+              <div>
+                <span className="inline-block px-3 py-1 bg-[#EE007C]/15 border border-[#EE007C]/40 text-[#EE007C] rounded-full text-xs font-mono font-bold tracking-wider mb-2">
+                  N° DE REGISTRO: {afiliadoId}
+                </span>
+                <h3 className="text-xl sm:text-2xl font-bold font-montserrat text-white">
+                  ¡Gracias por sumarte, {submittedNombre}!
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1.5 max-w-md mx-auto">
+                  {CAMPAIGN_COPY.carnetModal.success.subtitle}
+                </p>
+              </div>
+
+              {/* Tarjeta de Coordinación de Afiliación en Papel */}
+              <div className="p-4 bg-slate-900/80 border border-[#00AEEF]/30 rounded-xl text-left space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-[#00AEEF] uppercase tracking-wider">
+                  <Mail className="w-4 h-4" />
+                  <span>Próximo Paso: Afiliación Oficial en Papel</span>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Te escribiremos a <strong className="text-white">{submittedEmail}</strong>
+                  {submittedTelefono ? (
+                    <>
+                      {' '}y por WhatsApp a <strong className="text-white">{submittedTelefono}</strong>
+                    </>
+                  ) : null}{' '}
+                  para coordinar el encuentro en tu localidad ({municipio}) y completar la firma de tu ficha de afiliación oficial.
+                </p>
+              </div>
+
+              {/* Si dejó una propuesta en el buzón */}
+              {submittedPropuesta && (
+                <div className="p-4 bg-[#F8C300]/10 border border-[#F8C300]/30 rounded-xl text-left space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#F8C300] uppercase tracking-wider">
+                    <Lightbulb className="w-4 h-4" />
+                    <span>Propuesta Ingresada al Buzón</span>
+                  </div>
+                  <p className="text-xs text-slate-200 italic leading-relaxed bg-black/30 p-2.5 rounded-lg border border-white/5">
+                    “{submittedPropuesta}”
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Tu propuesta ha sido enviada directamente a la Junta Promotora de SOMOS Jujuy para ser analizada e incorporada a las mesas de trabajo.
+                  </p>
+                </div>
+              )}
+
+              {/* Acciones para Compartir */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleWhatsAppShare}
+                  className="w-full py-3 px-4 bg-[#25D366] hover:bg-[#20b858] text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4 fill-slate-950" />
+                  <span>{CAMPAIGN_COPY.carnetModal.success.whatsappShareButton}</span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShareLink}
+                    className="py-2.5 px-3 bg-white/10 hover:bg-white/15 text-white font-medium rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {isCopied ? (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">
+                          {CAMPAIGN_COPY.carnetModal.success.copiedButton}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-3.5 h-3.5 text-[#00AEEF]" />
+                        <span>{CAMPAIGN_COPY.carnetModal.success.copyLinkButton}</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResetAndClose}
+                    className="py-2.5 px-3 bg-[#0C2340] hover:bg-slate-800 border border-white/15 text-white font-medium rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Heart className="w-3.5 h-3.5 text-[#EE007C]" />
+                    <span>{CAMPAIGN_COPY.carnetModal.success.closeButton}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -15,22 +15,22 @@ export const CAMPAIGN_COPY = {
   // 2. Diapositivas Cinemáticas de Apertura (Los 4 Ejes de Campaña)
   slides: [
     {
+      id: 'hornocal',
+      tag: '01 / QUEBRADA',
+      location: 'Quebrada de Humahuaca',
+      title: 'Que nuestros pibes no tengan que irse.',
+      subtitle:
+        'Serranía del Hornocal y nuestros pueblos. Soberanía es tener salarios dignos, arraigo y futuro acá. Nadie debería verse obligado a dejar su tierra por falta de oportunidades.',
+      soundName: 'Viento Andino & Quena de Quebrada',
+    },
+    {
       id: 'yungas',
-      tag: '01 / YUNGAS',
+      tag: '02 / YUNGAS',
       location: 'Yungas y Ramal Jujeño',
       title: 'Que la riqueza de la selva se note en la mesa.',
       subtitle:
         'Parque Nacional Calilegua y el Ramal. Defender nuestros bienes naturales es garantizar salud pública, agua limpia y trabajo local para que las familias no tengan que elegir entre pagar la luz o comprar remedios.',
       soundName: 'Brisa & Gotas de Nuboselva',
-    },
-    {
-      id: 'hornocal',
-      tag: '02 / QUEBRADA',
-      location: 'Quebrada de Humahuaca',
-      title: 'Que nuestros pibes no tengan que irse.',
-      subtitle:
-        'Serranía del Hornocal y nuestros pueblos. Soberanía es tener salarios dignos, arraigo y futuro acá. Nadie debería verse obligado a dejar su tierra por falta de oportunidades.',
-      soundName: 'Viento & Quena de Quebrada',
     },
     {
       id: 'salinas',
@@ -62,24 +62,38 @@ export const CAMPAIGN_COPY = {
     nextAria: 'Paisaje siguiente',
   },
 
-  // 4. Modal de Afiliación y Credencial Oficial
+  // 4. Modal de Sumarse a SOMOS y Buzón de Propuestas
   carnetModal: {
-    title: 'Mi Credencial Digital SOMOS',
+    title: 'Sumate a SOMOS Jujuy',
     description:
-      'Sumate. Tu voz en el barrio vale, y acá se escucha. Generá tu credencial y empezá a construir el Jujuy que queremos, entre todos.',
+      'Sumate al proyecto que transforma Jujuy. Dejanos tus datos de contacto para coordinar la afiliación oficial en papel y tus propuestas en el buzón ciudadano.',
     form: {
       nombreLabel: 'Nombre y Apellido *',
       nombrePlaceholder: 'Ej: Marcelo Morales',
-      municipioLabel: 'Municipio / Barrio donde vivís *',
+      municipioLabel: 'Municipio / Localidad donde vivís *',
       telefonoLabel: 'WhatsApp / Celular (Opcional)',
       telefonoPlaceholder: 'Ej: 388 123-4567',
-      emailLabel: 'Correo Electrónico * (Obligatorio, para coordinar la afiliación en papel)',
+      emailLabel: 'Correo Electrónico * (Obligatorio, para coordinar la firma en papel)',
       emailPlaceholder: 'Ej: tuemail@gmail.com',
-      areaLabel: '¿Te gustaría militar o participar en algún área? (Opcional)',
-      submitButton: 'Generar Mi Credencial',
-      submittingButton: 'Conectando con el Padrón Digital...',
+      propuestaLabel: 'Buzón de Propuestas para Jujuy (Ideas, proyectos o inquietudes)',
+      propuestaPlaceholder: '¿Qué propuesta o idea tenés para tu barrio, tu localidad o para Jujuy? Contanos acá tu iniciativa para construir juntos...',
+      submitButton: 'Sumarme y Enviar Propuesta',
+      submittingButton: 'Registrando tus datos y propuesta...',
       disclaimer:
-        'Cada credencial tiene su número único. Acá se viene a construir en conjunto, sin sombras y sin trampas.',
+        'Tus datos serán utilizados exclusivamente para contactarte y coordinar la firma de la ficha de afiliación oficial en papel ante la justicia electoral.',
+    },
+    success: {
+      title: '¡Gracias por sumarte a SOMOS Jujuy!',
+      subtitle: 'Tu registro y propuesta han sido recibidos con éxito por la Junta Promotora.',
+      contactNotice:
+        'Nos pondremos en contacto contigo a través de tu correo electrónico para coordinar el encuentro y la firma de la ficha de afiliación en papel.',
+      proposalTag: 'Tu propuesta registrada en el buzón:',
+      whatsappShareButton: 'Invitar a un amigo / vecino por WhatsApp',
+      whatsappShareText: (url: string) =>
+        `¡Me acabo de sumar a SOMOS Jujuy y dejé mi propuesta para la provincia! Sumate vos también acá: ${url}`,
+      copyLinkButton: 'Copiar enlace de invitación',
+      copiedButton: '¡Enlace Copiado!',
+      closeButton: 'Entendido, volver a la página',
     },
     cardDesign: {
       headerCategory: 'JUJUY',
@@ -87,7 +101,7 @@ export const CAMPAIGN_COPY = {
       titularLabel: 'TITULAR',
       defaultTitular: 'NOMBRE Y APELLIDO',
       territorioLabel: 'TERRITORIO',
-      accionLabel: 'ACCIÓN',
+      accionLabel: 'PROPUESTA',
       numeroPadronLabel: 'ID',
       qrVerificationLabel: 'Validación en Padrón',
       partySubFooter: 'PARTIDO SOMOS JUJUY',
@@ -95,27 +109,21 @@ export const CAMPAIGN_COPY = {
     },
     actions: {
       whatsappButtonText: (afiliadoId: string) =>
-        `Escribir a SOMOS Jujuy con mi Credencial #${afiliadoId}`,
-      whatsappMessageTemplate: (municipio: string, afiliadoId: string, nombre: string, area: string) =>
-        `¡Hola SOMOS Jujuy! Me acabo de sumar desde ${municipio}. Mi Credencial Digital es la N° ${afiliadoId} a nombre de ${nombre}. Mi interés de participación es: "${area}".`,
-      downloadButton: 'Descargar Credencial (PNG)',
+        `Escribir a SOMOS Jujuy con mi N° de Registro #${afiliadoId}`,
+      whatsappMessageTemplate: (municipio: string, afiliadoId: string, nombre: string) =>
+        `¡Hola SOMOS Jujuy! Me acabo de sumar desde ${municipio}. Mi N° de Registro es #${afiliadoId} a nombre de ${nombre}.`,
+      downloadButton: 'Descargar Comprobante',
       downloadingButton: 'Generando...',
       shareButton: 'Invitar a un vecino',
       copiedButton: '¡Enlace Copiado!',
       shareMessageText: (afiliadoId: string, url: string) =>
-        `Ya tengo mi Credencial de SOMOS Jujuy (#${afiliadoId}). Sumate a transformar nuestra provincia: ${url}`,
+        `Ya me sumé a SOMOS Jujuy (Registro #${afiliadoId}). Sumate vos también a transformar nuestra provincia: ${url}`,
     },
   },
 
-  // 5. Áreas de Participación / Militancia Disponibles (Opcionales)
+  // 5. Áreas / Participación
   actionAreas: [
-    { id: 'adhesion_general', label: 'Solo Adhesión Ciudadana (General)' },
-    { id: 'economia', label: 'Economía, Salarios y Trabajo Joven' },
-    { id: 'territorio', label: 'Organización Barrial y Territorial' },
-    { id: 'guerrilla_digital', label: 'Guerrilla Digital y Comunicación' },
-    { id: 'juventudes', label: 'Juventudes y Estudiantes' },
-    { id: 'salud_educacion', label: 'Salud Pública y Educación Digna' },
-    { id: 'litio_ambiente', label: 'Litio, Ambiente y Bienes Comunes' },
+    { id: 'adhesion_general', label: 'Adhesión y Propuestas Ciudadanas' },
   ],
 
   // 6. Lista de Municipios Cargados en el Selector

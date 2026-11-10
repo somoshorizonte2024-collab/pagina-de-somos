@@ -9,7 +9,7 @@ import {
   Volume2,
   VolumeX,
   ArrowRight,
-  IdCard,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -20,8 +20,8 @@ import imgSalinas from './assets/images/jujuy_salinas_grandes_1793819889557.jpg'
 import imgComunidad from './assets/images/jujuy_comunidad_encuentro_1793819889846.jpg';
 
 const SLIDE_IMAGES = [
-  imgYungas,
   imgHornocal,
+  imgYungas,
   imgSalinas,
   imgComunidad,
 ];
@@ -70,13 +70,13 @@ export default function App() {
     soundscape.setLandscapeByIndex(currentSlide);
   }, [currentSlide]);
 
-  // Rotación automática suave de escenarios cada 7.5 segundos (se pausa si hay un modal abierto)
+  // Rotación automática suave de escenarios cada 10 segundos (se pausa si hay un modal abierto)
   useEffect(() => {
     if (isCarnetOpen || verificarAfiliadoId) return;
 
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % SLIDES.length);
-    }, 7500);
+    }, 10000);
 
     return () => clearInterval(timer);
   }, [isCarnetOpen, verificarAfiliadoId, currentSlide]);
@@ -223,7 +223,7 @@ export default function App() {
               }}
               className="py-3 px-6 bg-[#EE007C] hover:bg-[#d4006e] text-white font-bold rounded-xl text-sm flex items-center gap-2 shadow-2xl transition-all active:scale-95 cursor-pointer"
             >
-              <IdCard className="w-4 h-4" />
+              <Sparkles className="w-4 h-4" />
               <span>{CAMPAIGN_COPY.controls.heroCtaButton}</span>
               <ArrowRight className="w-4 h-4 ml-1" />
             </button>
@@ -231,27 +231,29 @@ export default function App() {
             {/* Control de Audio con Nombre del Paisaje Sonoro Activo */}
             <button
               onClick={handleAudioToggle}
-              className={`py-3 px-4 rounded-xl text-xs font-semibold border backdrop-blur-md flex items-center gap-2.5 transition-colors cursor-pointer ${
+              className={`py-3 px-4 rounded-xl text-xs font-semibold border backdrop-blur-md flex items-center gap-2.5 transition-all shadow-lg active:scale-95 cursor-pointer ${
                 isPlayingAudio && !isMuted
-                  ? 'bg-[#00AEEF]/20 border-[#00AEEF] text-[#00AEEF]'
-                  : 'bg-black/40 border-white/20 text-slate-300 hover:text-white'
+                  ? 'bg-[#00AEEF]/20 border-[#00AEEF] text-[#00AEEF] ring-1 ring-[#00AEEF]/40'
+                  : 'bg-black/50 hover:bg-black/70 border-white/25 hover:border-[#00AEEF] text-slate-200 hover:text-white'
               }`}
+              title="Activar o silenciar el paisaje sonoro inmersivo"
             >
               {isPlayingAudio && !isMuted ? (
                 <>
-                  <Volume2 className="w-4 h-4 text-[#00AEEF]" />
+                  <Volume2 className="w-4 h-4 text-[#00AEEF] animate-pulse" />
                   <div className="flex items-end gap-0.5 h-3">
                     <span className="w-0.5 h-2 bg-[#00AEEF] animate-pulse" />
                     <span className="w-0.5 h-3 bg-[#00AEEF] animate-pulse delay-75" />
                     <span className="w-0.5 h-1.5 bg-[#00AEEF] animate-pulse delay-150" />
                   </div>
-                  <span>{activeSlide.soundName}</span>
+                  <span className="font-medium">{activeSlide.soundName}</span>
                 </>
               ) : (
                 <>
-                  <VolumeX className="w-4 h-4" />
-                  <span>
-                    {CAMPAIGN_COPY.controls.audioInactivePrefix} {activeSlide.soundName}
+                  <VolumeX className="w-4 h-4 text-slate-400" />
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[#00AEEF] font-bold">Activar sonido:</span>
+                    <span>{activeSlide.soundName}</span>
                   </span>
                 </>
               )}
@@ -287,7 +289,7 @@ export default function App() {
 
           <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-slate-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span>Rotación activa (7.5s)</span>
+            <span>Rotación activa (10s)</span>
           </div>
         </div>
       </div>

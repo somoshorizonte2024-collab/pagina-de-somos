@@ -189,7 +189,7 @@ export const CiberbasesModal: React.FC<CiberbasesModalProps> = ({
               }}
               className="text-[#00AEEF] font-bold hover:underline cursor-pointer"
             >
-              Creá tu carnet y abrí la ciberbase de tu localidad
+              Sumate a SOMOS y abrí la ciberbase de tu localidad
             </button>
           </p>
         </div>

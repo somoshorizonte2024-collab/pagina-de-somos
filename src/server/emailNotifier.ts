@@ -5,7 +5,8 @@ export interface AfiliadoReportItem {
   numeroAfiliado: string;
   nombre: string;
   municipio: string;
-  areaAccion: string;
+  areaAccion?: string;
+  propuesta?: string;
   telefono: string;
   email: string;
   fechaRegistro: string;
@@ -29,16 +30,16 @@ function sanitizeCsvField(val: string): string {
 }
 
 export function generateAfiliadosCsv(afiliados: AfiliadoReportItem[]): string {
-  let csv = 'NumeroAfiliado,Nombre,Municipio,AreaAccion,Telefono,Email,FechaRegistro\n';
+  let csv = 'NumeroAfiliado,Nombre,Municipio,Propuesta,Telefono,Email,FechaRegistro\n';
   afiliados.forEach((af) => {
     const cleanNum = sanitizeCsvField(af.numeroAfiliado);
     const cleanName = sanitizeCsvField(af.nombre);
     const cleanMun = sanitizeCsvField(af.municipio);
-    const cleanArea = sanitizeCsvField(af.areaAccion || 'Solo Adhesión Ciudadana (General)');
+    const cleanPropuesta = sanitizeCsvField(af.propuesta || af.areaAccion || '');
     const cleanTel = sanitizeCsvField(af.telefono);
     const cleanMail = sanitizeCsvField(af.email || '');
     const cleanDate = sanitizeCsvField(af.fechaRegistro);
-    csv += `${cleanNum},${cleanName},${cleanMun},${cleanArea},${cleanTel},${cleanMail},${cleanDate}\n`;
+    csv += `${cleanNum},${cleanName},${cleanMun},${cleanPropuesta},${cleanTel},${cleanMail},${cleanDate}\n`;
   });
   // Retorna con UTF-8 BOM para que Microsoft Excel abra los acentos y caracteres especiales perfectamente
   return '\uFEFF' + csv;
@@ -87,7 +88,8 @@ export async function sendDailySummaryEmail(
         const safeNombre = escapeHtml(a.nombre);
         const safeEmail = escapeHtml(a.email);
         const safeMunicipio = escapeHtml(a.municipio);
-        const safeArea = escapeHtml(a.areaAccion || 'General');
+        const userPropuesta = a.propuesta || a.areaAccion || '';
+        const safePropuesta = escapeHtml(userPropuesta);
         const cleanTelDigits = (a.telefono || '').replace(/\D/g, '');
         const safeTel = escapeHtml(a.telefono);
 
@@ -106,7 +108,13 @@ export async function sendDailySummaryEmail(
           }
         </td>
         <td style="padding: 10px; color: #334155;">${safeMunicipio}</td>
-        <td style="padding: 10px; color: #64748b; font-size: 12px;">${safeArea}</td>
+        <td style="padding: 10px; color: #334155; font-size: 12px; max-width: 280px; line-height: 1.4;">
+          ${
+            safePropuesta
+              ? `<span style="display: inline-block; padding: 4px 8px; background: #fdf2f8; border-left: 3px solid #EE007C; border-radius: 4px; color: #831843; font-style: italic;">“${safePropuesta}”</span>`
+              : '<span style="color: #94a3b8; font-style: italic;">(Sin propuesta escrita)</span>'
+          }
+        </td>
       </tr>
     `;
       }
@@ -120,7 +128,7 @@ export async function sendDailySummaryEmail(
       <meta charset="utf-8">
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; background-color: #f1f5f9; }
-        .container { max-width: 820px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .container { max-width: 860px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .header { background: #0C2340; color: #ffffff; padding: 24px; text-align: center; border-bottom: 4px solid #EE007C; }
         .content { padding: 24px; }
         .badge { background: #00AEEF; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; }
@@ -134,7 +142,7 @@ export async function sendDailySummaryEmail(
         <div class="header">
           <h1 style="margin: 0; font-size: 26px; letter-spacing: 1px; color: #ffffff;">SOMOS JUJUY</h1>
           <p style="margin: 6px 0 0; font-size: 13px; color: #00AEEF; font-weight: bold;">
-            Reporte Diario de Afiliaciones y Contactos
+            Reporte Diario de Afiliaciones y Buzón de Propuestas
           </p>
         </div>
 
@@ -148,19 +156,19 @@ export async function sendDailySummaryEmail(
 
           <p style="color: #475569; font-size: 14px; line-height: 1.5; margin: 8px 0 16px;">
             Hoy se registraron <strong>${afiliadosHoy.length} nueva(s) persona(s)</strong> en la plataforma.
-            Aquí tienes sus correos y teléfonos para <strong>coordinar la firma de la ficha de afiliación en papel</strong>:
+            Aquí tienes sus correos y teléfonos para <strong>coordinar la firma de la ficha de afiliación en papel</strong>, junto con sus iniciativas ingresadas al <strong>Buzón de Propuestas</strong>:
           </p>
 
           <div style="overflow-x: auto;">
             <table>
               <thead>
                 <tr>
-                  <th>N° Credencial</th>
+                  <th>N° Registro</th>
                   <th>Nombre y Apellido</th>
                   <th>Correo Electrónico</th>
                   <th>WhatsApp</th>
                   <th>Municipio</th>
-                  <th>Militancia</th>
+                  <th>Buzón de Propuestas</th>
                 </tr>
               </thead>
               <tbody>
